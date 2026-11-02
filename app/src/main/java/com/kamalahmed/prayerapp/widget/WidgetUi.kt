@@ -98,6 +98,7 @@ fun WidgetContent(kind: WidgetKind, style: WidgetStyle, data: WidgetData, intera
     }
 }
 
+@android.annotation.SuppressLint("LocalContextResourcesRead") // Glance context, not a Compose UI context
 @Composable
 private fun backgroundModifier(ui: WidgetUiState): GlanceModifier {
     val st = ui.style
@@ -324,8 +325,8 @@ private fun Tracker(ui: WidgetUiState) {
     }
 }
 
-private val dateFmt = DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault())
 
+@android.annotation.SuppressLint("LocalContextResourcesRead")
 @Composable
 private fun Large(ui: WidgetUiState) {
     val d = ui.data
@@ -334,7 +335,7 @@ private fun Large(ui: WidgetUiState) {
     Column(modifier = GlanceModifier.fillMaxSize()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = GlanceModifier.defaultWeight()) {
-                Text(d.today.format(dateFmt), style = ui.ts(14f, bold = true), maxLines = 1)
+                Text(d.today.format(DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault())), style = ui.ts(14f, bold = true), maxLines = 1)
                 if (ui.style.showHijri) Text(d.hijri.format(), style = ui.ts(12f, ui.pal.gold), maxLines = 1)
             }
             Text(d.city, style = ui.ts(11f, ui.pal.sub), maxLines = 1)

@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.kamalahmed.prayerapp.MainActivity
@@ -21,7 +20,6 @@ object Channels {
     const val IQAMA = "iqama_v1"
 
     fun create(ctx: Context) {
-        if (Build.VERSION.SDK_INT < 26) return
         val nm = ctx.getSystemService(NotificationManager::class.java)
         val alarmAttrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
@@ -50,7 +48,6 @@ object Channels {
     }
 
     fun isBlocked(ctx: Context, id: String): Boolean {
-        if (Build.VERSION.SDK_INT < 26) return false
         val ch = ctx.getSystemService(NotificationManager::class.java).getNotificationChannel(id) ?: return false
         return ch.importance == NotificationManager.IMPORTANCE_NONE
     }

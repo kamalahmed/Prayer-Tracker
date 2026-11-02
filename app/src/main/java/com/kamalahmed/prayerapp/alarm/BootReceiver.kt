@@ -20,6 +20,7 @@ class BootReceiver : BroadcastReceiver() {
     @Inject lateinit var hooks: AlarmHooks
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action !in ACTIONS) return
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             try {
@@ -30,5 +31,13 @@ class BootReceiver : BroadcastReceiver() {
                 pending.finish()
             }
         }
+    }
+
+    private companion object {
+        val ACTIONS = setOf(
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED, Intent.ACTION_TIME_CHANGED,
+            Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_DATE_CHANGED,
+            android.app.AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED,
+        )
     }
 }

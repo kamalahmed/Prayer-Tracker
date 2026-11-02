@@ -87,6 +87,7 @@ fun OnboardingScreen(vm: SettingsViewModel) {
     val notifPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { vm.refreshStatus() }
     LaunchedEffect(step) { vm.refreshStatus() }
 
+    androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding().padding(horizontal = 20.dp)) {
         // Progress dots
         Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.Center) {
@@ -189,6 +190,7 @@ fun OnboardingScreen(vm: SettingsViewModel) {
                 Text(if (step < STEPS - 1) "Next" else "Start")
             }
         }
+    }
     }
 }
 
