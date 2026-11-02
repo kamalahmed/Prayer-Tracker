@@ -34,3 +34,10 @@ To resume: `git tag -l 'phase-*'`, check out the latest, and continue with the n
 
 ## What's next
 Next: push to https://github.com/kamalahmed/Prayer-Tracker, publish the `v0.1.0-beta.1` pre-release with the APK and its .sha256, then test on a real device.
+
+## Phase 10 — Feedback (v0.1.0-beta.2, versionCode 3) — tag `phase-10-feedback`
+- Masjid finder rebuilt on OSM Overpass: 2 endpoints, timeouts, User-Agent, 24h cache per ~1km cell, offline and error states, list sorted by distance, geo: intent.
+- Streaks bottom-nav tab with a Week/Month/Year dashboard and day backfill/edit (StatsTest).
+- Widget opacity is linear, 0 = fully transparent (WidgetTest, WidgetRenderTest).
+- Separate padV/padH/spacing (0..), top/center/bottom alignment, transparent root with a wrap-content panel, 1-cell row widgets (WidgetDimsTest; tall 520dp render test).
+- Results: assembleDebug OK, 60 unit tests passing, lint 0 errors, connectedDebugAndroidTest 2/2 passing on the API 34 emulator.
