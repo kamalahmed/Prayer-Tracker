@@ -25,6 +25,7 @@ class PrayerApp : Application(), Configuration.Provider {
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var scheduler: AlarmScheduler
     @Inject lateinit var hooks: AlarmHooks
+    @Inject lateinit var tracker: com.kamalahmed.prayerapp.tracker.TrackerRepository
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -43,5 +44,10 @@ class PrayerApp : Application(), Configuration.Provider {
                 hooks.onSystemChange()
             }
         }
+        // Marking prayers in the app updates the streak widgets.
+        appScope.launch {
+            tracker.changes.debounce(300).collect { com.kamalahmed.prayerapp.widget.WidgetUpdater.updateAll(this@PrayerApp) }
+        }
+        com.kamalahmed.prayerapp.widget.WidgetUpdater.ensureScheduled(this)
     }
 }

@@ -49,7 +49,7 @@ enum class TopDest(val route: String, val label: String, val icon: ImageVector) 
     MORE("more", "More", Icons.Filled.MoreHoriz),
 }
 
-val availableSettings = setOf(SettingsDest.NOTIFICATIONS, SettingsDest.SOUND, SettingsDest.SYSTEM)
+val availableSettings = setOf(SettingsDest.NOTIFICATIONS, SettingsDest.SOUND, SettingsDest.SYSTEM, SettingsDest.WIDGETS)
 
 object Routes {
     const val CALENDAR = "calendar"
@@ -105,12 +105,13 @@ fun PrayerAppRoot() {
                 }
                 composable(SettingsDest.SOUND.route) { SoundSettingsScreen(hiltViewModel(), onBack = back) }
                 composable(SettingsDest.SYSTEM.route) { SystemScreen(hiltViewModel(), onBack = back) }
+                composable(SettingsDest.WIDGETS.route) { com.kamalahmed.prayerapp.ui.widgets.WidgetStudioScreen(onBack = back) }
                 composable(TopDest.MORE.route) {
                     MoreScreen(
                         onStreaks = { nav.navigate(Routes.STREAKS) },
                         onCalendar = { nav.navigate(Routes.CALENDAR) },
                         onHolidays = { nav.navigate(Routes.HOLIDAYS) },
-                        onWidgets = null,
+                        onWidgets = { nav.navigate(SettingsDest.WIDGETS.route) },
                         onAbout = null,
                     )
                 }

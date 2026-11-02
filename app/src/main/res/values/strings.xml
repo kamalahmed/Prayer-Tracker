@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">Prayer App</string>
+    <string name="widget_desc_next">Next prayer with live countdown</string>
+    <string name="widget_desc_wide">All five prayers in a row with the hijri day</string>
+    <string name="widget_desc_streak">Next prayer plus today\'s progress and streak</string>
+    <string name="widget_desc_tracker">Tap a prayer to mark it prayed and keep your streak</string>
+    <string name="widget_desc_large">Dashboard: ring countdown, all prayers, hijri date and streak</string>
+    <string name="widget_desc_minimal">Just the next prayer, as text</string>
+    <string name="widget_customize">Customize widget</string>
 </resources>

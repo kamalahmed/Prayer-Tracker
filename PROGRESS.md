@@ -10,7 +10,7 @@ To resume: `git tag -l 'phase-*'`, check out the latest, and continue with the n
 | 3 – Main UI (Prayers, Times, Qibla) | `phase-3-main-ui` | ✅ Done |
 | 4 – Alarms & notifications (exact alarms, adhan service, full-screen) | `phase-4-alarms` | ✅ Done |
 | 5 – Prayer tracker / streaks (Room) | `phase-5-tracker` | ✅ Done |
-| 6 – Widgets (Glance, 6 types, config screen) | `phase-6-widgets` | ⏳ Next |
+| 6 – Widgets (Glance, 6 types, config screen) | `phase-6-widgets` | ✅ Done |
 | 7 – Settings completion & polish, onboarding | `phase-7-settings-polish` | Pending |
 | 8 – Hardening, lint, release config, README | `v0.1.0` | Pending |
 
@@ -18,4 +18,4 @@ To resume: `git tag -l 'phase-*'`, check out the latest, and continue with the n
 - JDK 17 (Temurin), Gradle 8.14.3 (wrapper), AGP 8.13, Kotlin 2.2.20, compileSdk/targetSdk 36, minSdk 26.
 
 ## What's next
-Phase 6: Glance widgets (6 types), per-instance config with live preview, updates.
+Phase 7: remaining settings sections, onboarding with permissions, accessibility, edge-to-edge.
