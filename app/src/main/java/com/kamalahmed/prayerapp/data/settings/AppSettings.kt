@@ -39,10 +39,10 @@ data class AppSettings(
         if (it == Prayer.SUNRISE) NotifyMode.OFF else NotifyMode.ADHAN
     },
     val soundSource: SoundSource = SoundSource.BUNDLED,
-    val bundledSound: String = "adhan_makkah",
-    val fajrBundledSound: String = "adhan_fajr",
+    val bundledSound: String = "adhan_full",
+    val fajrBundledSound: String = "adhan_full",
     val soundUri: String? = null,
-    val soundName: String = "Adhan (Makkah)",
+    val soundName: String = "Adhan (full)",
     val maxPlaySeconds: Int = 300,
     val loopSound: Boolean = false,
     val useAlarmStream: Boolean = true,

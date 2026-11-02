@@ -26,6 +26,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kamalahmed.prayerapp.ui.screens.PlaceholderScreen
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.kamalahmed.prayerapp.ui.settings.NotificationSettingsScreen
+import com.kamalahmed.prayerapp.ui.settings.SettingsDest
+import com.kamalahmed.prayerapp.ui.settings.SettingsScreen
+import com.kamalahmed.prayerapp.ui.settings.SoundSettingsScreen
+import com.kamalahmed.prayerapp.ui.settings.SystemScreen
 import com.kamalahmed.prayerapp.ui.prayers.PrayersScreen
 import com.kamalahmed.prayerapp.ui.qibla.QiblaScreen
 import com.kamalahmed.prayerapp.ui.times.HolidaysScreen
@@ -41,6 +47,8 @@ enum class TopDest(val route: String, val label: String, val icon: ImageVector) 
     MORE("more", "More", Icons.Filled.MoreHoriz),
 }
 
+val availableSettings = setOf(SettingsDest.NOTIFICATIONS, SettingsDest.SOUND, SettingsDest.SYSTEM)
+
 object Routes {
     const val CALENDAR = "calendar"
     const val HOLIDAYS = "holidays"
@@ -51,6 +59,7 @@ fun PrayerAppRoot() {
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
+    val back: () -> Unit = { nav.popBackStack() }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
@@ -84,7 +93,14 @@ fun PrayerAppRoot() {
                     TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) })
                 }
                 composable(TopDest.QIBLA.route) { QiblaScreen() }
-                composable(TopDest.SETTINGS.route) { PlaceholderScreen("Settings") }
+                composable(TopDest.SETTINGS.route) {
+                    SettingsScreen(hiltViewModel(), open = { nav.navigate(it.route) }, available = availableSettings)
+                }
+                composable(SettingsDest.NOTIFICATIONS.route) {
+                    NotificationSettingsScreen(hiltViewModel(), onBack = back, onSound = { nav.navigate(SettingsDest.SOUND.route) })
+                }
+                composable(SettingsDest.SOUND.route) { SoundSettingsScreen(hiltViewModel(), onBack = back) }
+                composable(SettingsDest.SYSTEM.route) { SystemScreen(hiltViewModel(), onBack = back) }
                 composable(TopDest.MORE.route) { PlaceholderScreen("More") }
                 composable(Routes.CALENDAR) { MonthlyCalendarScreen(onBack = { nav.popBackStack() }) }
                 composable(Routes.HOLIDAYS) { HolidaysScreen(onBack = { nav.popBackStack() }) }
