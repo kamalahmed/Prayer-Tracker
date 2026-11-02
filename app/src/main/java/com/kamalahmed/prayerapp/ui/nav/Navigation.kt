@@ -26,6 +26,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kamalahmed.prayerapp.ui.screens.PlaceholderScreen
+import com.kamalahmed.prayerapp.ui.prayers.PrayersScreen
+import com.kamalahmed.prayerapp.ui.qibla.QiblaScreen
+import com.kamalahmed.prayerapp.ui.times.HolidaysScreen
+import com.kamalahmed.prayerapp.ui.times.MonthlyCalendarScreen
+import com.kamalahmed.prayerapp.ui.times.TimesScreen
 import com.kamalahmed.prayerapp.ui.theme.Card
 
 enum class TopDest(val route: String, val label: String, val icon: ImageVector) {
@@ -34,6 +39,11 @@ enum class TopDest(val route: String, val label: String, val icon: ImageVector) 
     QIBLA("qibla", "Qibla", Icons.Filled.Navigation),
     SETTINGS("settings", "Settings", Icons.Filled.Settings),
     MORE("more", "More", Icons.Filled.MoreHoriz),
+}
+
+object Routes {
+    const val CALENDAR = "calendar"
+    const val HOLIDAYS = "holidays"
 }
 
 @Composable
@@ -69,9 +79,15 @@ fun PrayerAppRoot() {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             NavHost(nav, startDestination = TopDest.PRAYERS.route) {
-                TopDest.entries.forEach { d ->
-                    composable(d.route) { PlaceholderScreen(d.label) }
+                composable(TopDest.PRAYERS.route) { PrayersScreen() }
+                composable(TopDest.TIMES.route) {
+                    TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) })
                 }
+                composable(TopDest.QIBLA.route) { QiblaScreen() }
+                composable(TopDest.SETTINGS.route) { PlaceholderScreen("Settings") }
+                composable(TopDest.MORE.route) { PlaceholderScreen("More") }
+                composable(Routes.CALENDAR) { MonthlyCalendarScreen(onBack = { nav.popBackStack() }) }
+                composable(Routes.HOLIDAYS) { HolidaysScreen(onBack = { nav.popBackStack() }) }
             }
         }
     }

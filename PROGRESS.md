@@ -7,8 +7,8 @@ To resume: `git tag -l 'phase-*'`, check out the latest, and continue with the n
 |---|---|---|
 | 1 – Project scaffold (Gradle, Hilt, Compose theme, bottom nav, DataStore settings) | `phase-1-scaffold` | ✅ Done |
 | 2 – Core engine (prayer times, hijri, location) | `phase-2-core-engine` | ✅ Done |
-| 3 – Main UI (Prayers, Times, Qibla) | `phase-3-main-ui` | ⏳ Next |
-| 4 – Alarms & notifications (exact alarms, adhan service, full-screen) | `phase-4-alarms` | Pending |
+| 3 – Main UI (Prayers, Times, Qibla) | `phase-3-main-ui` | ✅ Done |
+| 4 – Alarms & notifications (exact alarms, adhan service, full-screen) | `phase-4-alarms` | ⏳ Next |
 | 5 – Prayer tracker / streaks (Room) | `phase-5-tracker` | Pending |
 | 6 – Widgets (Glance, 6 types, config screen) | `phase-6-widgets` | Pending |
 | 7 – Settings completion & polish, onboarding | `phase-7-settings-polish` | Pending |
@@ -18,7 +18,4 @@ To resume: `git tag -l 'phase-*'`, check out the latest, and continue with the n
 - JDK 17 (Temurin), Gradle 8.14.3 (wrapper), AGP 8.13, Kotlin 2.2.20, compileSdk/targetSdk 36, minSdk 26.
 
 ## What's next
-Phase 3: Prayers (countdown ring), Times (list, calendar, holidays, masjid link), Qibla compass screens.
-
-## Notes
-- Engine verified for Sharjah 2 Nov 2026 (Dubai 18.2°/18.2°): Fajr 05:08, Sunrise 06:27, Dhuhr 12:02, Asr 15:13, Maghrib 17:37, Isha 18:55 (reference 18:56).
+Phase 4: exact alarms, adhan foreground service, sound sources, full-screen alarm, reminders, iqama.
