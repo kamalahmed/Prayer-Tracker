@@ -18,6 +18,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -49,7 +51,7 @@ enum class TopDest(val route: String, val label: String, val icon: ImageVector) 
     MORE("more", "More", Icons.Filled.MoreHoriz),
 }
 
-val availableSettings = setOf(SettingsDest.NOTIFICATIONS, SettingsDest.SOUND, SettingsDest.SYSTEM, SettingsDest.WIDGETS)
+val availableSettings = SettingsDest.entries.toSet()
 
 object Routes {
     const val CALENDAR = "calendar"
@@ -59,6 +61,14 @@ object Routes {
 
 @Composable
 fun PrayerAppRoot() {
+    val rootVm: com.kamalahmed.prayerapp.ui.settings.SettingsViewModel = hiltViewModel()
+    val rootSettings by rootVm.settings.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { rootVm.autoRefreshIfEnabled() }
+    val st = rootSettings ?: return
+    if (!st.onboardingDone) {
+        com.kamalahmed.prayerapp.ui.onboarding.OnboardingScreen(rootVm)
+        return
+    }
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
@@ -105,6 +115,14 @@ fun PrayerAppRoot() {
                 }
                 composable(SettingsDest.SOUND.route) { SoundSettingsScreen(hiltViewModel(), onBack = back) }
                 composable(SettingsDest.SYSTEM.route) { SystemScreen(hiltViewModel(), onBack = back) }
+                composable(SettingsDest.CALCULATION.route) { com.kamalahmed.prayerapp.ui.settings.CalculationScreen(hiltViewModel(), onBack = back) }
+                composable(SettingsDest.LOCATION.route) { com.kamalahmed.prayerapp.ui.settings.LocationScreen(hiltViewModel(), onBack = back) }
+                composable(SettingsDest.TIME.route) { com.kamalahmed.prayerapp.ui.settings.TimeSettingsScreen(hiltViewModel(), onBack = back) }
+                composable(SettingsDest.IQAMA.route) { com.kamalahmed.prayerapp.ui.settings.IqamaScreen(hiltViewModel(), onBack = back) }
+                composable(SettingsDest.APP.route) {
+                    val vm: com.kamalahmed.prayerapp.ui.settings.SettingsViewModel = hiltViewModel()
+                    com.kamalahmed.prayerapp.ui.settings.AppScreen(vm, onBack = back, onOnboarding = { vm.update { it.copy(onboardingDone = false) } })
+                }
                 composable(SettingsDest.WIDGETS.route) { com.kamalahmed.prayerapp.ui.widgets.WidgetStudioScreen(onBack = back) }
                 composable(TopDest.MORE.route) {
                     MoreScreen(
@@ -112,7 +130,7 @@ fun PrayerAppRoot() {
                         onCalendar = { nav.navigate(Routes.CALENDAR) },
                         onHolidays = { nav.navigate(Routes.HOLIDAYS) },
                         onWidgets = { nav.navigate(SettingsDest.WIDGETS.route) },
-                        onAbout = null,
+                        onAbout = { nav.navigate(SettingsDest.APP.route) },
                     )
                 }
                 composable(Routes.CALENDAR) { MonthlyCalendarScreen(onBack = { nav.popBackStack() }) }

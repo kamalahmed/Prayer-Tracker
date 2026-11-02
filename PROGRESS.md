@@ -18,4 +18,4 @@ To resume: `git tag -l 'phase-*'`, check out the latest, and continue with the n
 - JDK 17 (Temurin), Gradle 8.14.3 (wrapper), AGP 8.13, Kotlin 2.2.20, compileSdk/targetSdk 36, minSdk 26.
 
 ## What's next
-Phase 7: remaining settings sections, onboarding with permissions, accessibility, edge-to-edge.
+Phase 8: lint, release build (R8), README, code review, v0.1.0.

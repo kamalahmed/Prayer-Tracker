@@ -57,6 +57,22 @@ class SettingsViewModel @Inject constructor(
         else repo.update { it.copy(soundSource = SoundSource.CUSTOM_FILE, soundUri = result.first, soundName = result.second) }
     }
 
+    fun hasLocationPermission() = location.hasPermission()
+
+    fun setCity(c: com.kamalahmed.prayerapp.core.location.City) = update {
+        it.copy(autoLocation = false, latitude = c.lat, longitude = c.lng, cityName = c.name, timeZoneId = c.tz)
+    }
+
+    /** Back to defaults but keep onboarding finished. */
+    fun resetAll() = update { AppSettings(onboardingDone = true) }
+
+    fun finishOnboarding() = update { it.copy(onboardingDone = true) }
+
+    /** Auto location on app open (respects the geofence). */
+    fun autoRefreshIfEnabled() = viewModelScope.launch {
+        if (repo.current().autoLocation) location.refresh(force = false)
+    }
+
     fun refreshLocation() = viewModelScope.launch {
         message.value = when (val r = location.refresh(force = true)) {
             is LocationResult.Updated -> "Location set to ${r.city}"

@@ -1,0 +1,293 @@
+package com.kamalahmed.prayerapp.ui.settings
+
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.widget.Toast
+import com.kamalahmed.prayerapp.core.location.Cities
+import com.kamalahmed.prayerapp.core.model.AsrMethod
+import com.kamalahmed.prayerapp.core.model.HighLatitudeRule
+import com.kamalahmed.prayerapp.core.model.Prayer
+import com.kamalahmed.prayerapp.core.model.TimeFormat
+import com.kamalahmed.prayerapp.core.prayer.CalculationMethod
+import com.kamalahmed.prayerapp.core.prayer.PrayerSchedule
+import com.kamalahmed.prayerapp.data.prayer.toCalcParams
+import com.kamalahmed.prayerapp.data.settings.AppSettings
+import com.kamalahmed.prayerapp.ui.common.CardGroup
+import com.kamalahmed.prayerapp.ui.common.ListRow
+import com.kamalahmed.prayerapp.ui.common.RowDivider
+import com.kamalahmed.prayerapp.ui.common.SectionHeader
+import com.kamalahmed.prayerapp.ui.common.SliderRow
+import com.kamalahmed.prayerapp.ui.common.StepperRow
+import com.kamalahmed.prayerapp.ui.common.SubScreen
+import com.kamalahmed.prayerapp.ui.common.SwitchRow
+import java.time.LocalDate
+import java.util.Locale
+import kotlin.math.roundToInt
+
+@Composable
+private fun RadioRow(title: String, selected: Boolean, subtitle: String? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().selectable(selected = selected, onClick = onClick, role = Role.RadioButton).padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null, modifier = Modifier.padding(8.dp))
+        Column(Modifier.padding(vertical = 8.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun Messages(vm: SettingsViewModel) {
+    val ctx = LocalContext.current
+    val msg by vm.message.collectAsStateWithLifecycle()
+    LaunchedEffect(msg) { msg?.let { Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show(); vm.message.value = null } }
+}
+
+/** Today's times for the current settings — shown live while changing calculation options. */
+@Composable
+private fun TodayPreview(s: AppSettings) {
+    val day = remember(s) { runCatching { PrayerSchedule(s.toCalcParams()).day(LocalDate.now()) }.getOrNull() }
+    CardGroup {
+        Row(Modifier.fillMaxWidth().padding(12.dp)) {
+            if (day == null) Text("Invalid settings") else Prayer.entries.forEach { p ->
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(p.abbr, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(TimeFormat.time(day[p], s.use24h, showAmPm = false), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CalculationScreen(vm: SettingsViewModel, onBack: () -> Unit) {
+    val s = vm.settings.collectAsStateWithLifecycle().value ?: return
+    SubScreen("Calculation", onBack) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+            SectionHeader("Today with these settings")
+            TodayPreview(s)
+            SectionHeader("Method")
+            CardGroup {
+                CalculationMethod.entries.forEach { m ->
+                    val angles = if (m.ishaInterval > 0) "Fajr ${m.fajrAngle}°, Isha +${m.ishaInterval} min" else "Fajr ${m.fajrAngle}°, Isha ${m.ishaAngle}°"
+                    RadioRow(m.label, s.calcMethod == m.name, angles) { vm.update { it.copy(calcMethod = m.name) } }
+                }
+            }
+            SectionHeader("Asr")
+            CardGroup {
+                AsrMethod.entries.forEach { a -> RadioRow(a.label, s.asrMethod == a) { vm.update { it.copy(asrMethod = a) } } }
+            }
+            SectionHeader("High latitude rule")
+            CardGroup {
+                HighLatitudeRule.entries.forEach { r -> RadioRow(r.label, s.highLatRule == r) { vm.update { it.copy(highLatRule = r) } } }
+            }
+            SectionHeader("Manual adjustments (minutes)")
+            CardGroup {
+                Prayer.entries.forEachIndexed { i, p ->
+                    if (i > 0) RowDivider()
+                    val v = s.adjustment(p)
+                    StepperRow(p.displayName, if (v > 0) "+$v min" else "$v min",
+                        onMinus = { vm.update { it.copy(adjustments = it.adjustments + (p to (v - 1).coerceAtLeast(-30))) } },
+                        onPlus = { vm.update { it.copy(adjustments = it.adjustments + (p to (v + 1).coerceAtMost(30))) } })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LocationScreen(vm: SettingsViewModel, onBack: () -> Unit) {
+    val s = vm.settings.collectAsStateWithLifecycle().value ?: return
+    Messages(vm)
+    var query by rememberSaveable { mutableStateOf("") }
+    var masjid by rememberSaveable { mutableStateOf(s.masjidName) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
+        if (r.values.any { it }) { vm.update { it.copy(autoLocation = true) }; vm.refreshLocation() }
+        else vm.message.value = "Location permission denied – choose a city instead"
+    }
+    fun enableAuto() {
+        if (vm.hasLocationPermission()) { vm.update { it.copy(autoLocation = true) }; vm.refreshLocation() }
+        else permission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+    }
+    SubScreen("Location", onBack) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+            SectionHeader("Current")
+            CardGroup {
+                ListRow(s.cityName, subtitle = String.format(Locale.US, "%.4f, %.4f · %s", s.latitude, s.longitude, s.timeZoneId), leading = Icons.Filled.MyLocation)
+            }
+            SectionHeader("Automatic")
+            CardGroup {
+                SwitchRow("Automatic location", s.autoLocation, subtitle = "Uses network/GPS occasionally, low power") { on ->
+                    if (on) enableAuto() else vm.update { it.copy(autoLocation = false) }
+                }
+                if (s.autoLocation) {
+                    RowDivider()
+                    ListRow("Update now", onClick = { vm.refreshLocation() })
+                    RowDivider()
+                    SliderRow("Geofence", s.geofenceKm.toFloat(), 1f..50f, "${s.geofenceKm} km") { v ->
+                        vm.update { it.copy(geofenceKm = v.roundToInt()) }
+                    }
+                    Text(
+                        "Times are only recalculated when you move further than this.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    )
+                }
+            }
+            SectionHeader("Masjid")
+            CardGroup {
+                OutlinedTextField(
+                    value = masjid, onValueChange = { masjid = it; vm.update { st -> st.copy(masjidName = it.take(60)) } },
+                    label = { Text("Masjid name (optional)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                )
+                ListRow(
+                    "Set masjid at current location",
+                    subtitle = if (s.masjidLat != null) String.format(Locale.US, "%.4f, %.4f", s.masjidLat, s.masjidLng) else "Used for directions from the Times tab",
+                    onClick = { vm.update { it.copy(masjidLat = it.latitude, masjidLng = it.longitude) } },
+                )
+            }
+            SectionHeader("Choose a city")
+            CardGroup {
+                OutlinedTextField(
+                    value = query, onValueChange = { query = it }, singleLine = true,
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    label = { Text("Search cities") }, modifier = Modifier.fillMaxWidth().padding(12.dp),
+                )
+                Cities.search(query).take(40).forEachIndexed { i, c ->
+                    if (i > 0) RowDivider()
+                    RadioRow(c.display, !s.autoLocation && s.cityName == c.name, c.tz) { vm.setCity(c) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TimeSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
+    val s = vm.settings.collectAsStateWithLifecycle().value ?: return
+    SubScreen("Time", onBack) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+            SectionHeader("Format")
+            CardGroup {
+                SwitchRow("24-hour clock", s.use24h) { v -> vm.update { it.copy(use24h = v) } }
+                RowDivider()
+                SwitchRow("Abbreviated prayer names", s.abbreviations, subtitle = "FJR, DHR, ASR, MGB, ISH") { v -> vm.update { it.copy(abbreviations = v) } }
+            }
+            SectionHeader("Hijri date")
+            CardGroup {
+                StepperRow("Adjustment", if (s.hijriAdjust > 0) "+${s.hijriAdjust} day" else "${s.hijriAdjust} day",
+                    onMinus = { vm.update { it.copy(hijriAdjust = (it.hijriAdjust - 1).coerceAtLeast(-2)) } },
+                    onPlus = { vm.update { it.copy(hijriAdjust = (it.hijriAdjust + 1).coerceAtMost(2)) } })
+                RowDivider()
+                SwitchRow("Advance after Maghrib", s.autoIncrementHijri, subtitle = "The Islamic day starts at sunset") { v ->
+                    vm.update { it.copy(autoIncrementHijri = v) }
+                }
+            }
+            SectionHeader("After a prayer starts")
+            CardGroup {
+                StepperRow("Count-up", if (s.countUpMinutes == 0) "Off" else "${s.countUpMinutes} min",
+                    onMinus = { vm.update { it.copy(countUpMinutes = (it.countUpMinutes - 5).coerceAtLeast(0)) } },
+                    onPlus = { vm.update { it.copy(countUpMinutes = (it.countUpMinutes + 5).coerceAtMost(90)) } })
+                Text(
+                    "Shows time elapsed since the current prayer began, for this many minutes.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun IqamaScreen(vm: SettingsViewModel, onBack: () -> Unit) {
+    val s = vm.settings.collectAsStateWithLifecycle().value ?: return
+    SubScreen("Iqama", onBack) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+            CardGroup {
+                SwitchRow("Show iqama times", s.iqamaEnabled, subtitle = "Minutes after the adhan") { v -> vm.update { it.copy(iqamaEnabled = v) } }
+            }
+            if (s.iqamaEnabled) {
+                SectionHeader("Minutes after adhan")
+                CardGroup {
+                    Prayer.obligatory.forEachIndexed { i, p ->
+                        if (i > 0) RowDivider()
+                        val v = s.iqama(p)
+                        StepperRow(p.displayName, "$v min",
+                            onMinus = { vm.update { it.copy(iqamaMinutes = it.iqamaMinutes + (p to (v - 1).coerceAtLeast(0))) } },
+                            onPlus = { vm.update { it.copy(iqamaMinutes = it.iqamaMinutes + (p to (v + 1).coerceAtMost(90))) } })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AppScreen(vm: SettingsViewModel, onBack: () -> Unit, onOnboarding: () -> Unit) {
+    var confirmReset by remember { mutableStateOf(false) }
+    SubScreen("App", onBack) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+            SectionHeader("About")
+            CardGroup {
+                ListRow("Prayer App", subtitle = "Version 0.1.0 · offline prayer times, adhan, widgets and tracker")
+                RowDivider()
+                ListRow("Adhan recordings", subtitle = "\"Beautiful adhan.ogg\" by Adam-synagda and \"Adhan.ogg\" by Aishatu98, Wikimedia Commons, CC0 (public domain)")
+                RowDivider()
+                ListRow("Privacy", subtitle = "No accounts, no analytics. Location stays on the device and is only used to calculate times.")
+            }
+            SectionHeader("Manage")
+            CardGroup {
+                ListRow("Show onboarding again", onClick = onOnboarding)
+                RowDivider()
+                ListRow("Reset all settings", subtitle = "Prayer log and widgets are kept", onClick = { confirmReset = true })
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+    if (confirmReset) {
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            title = { Text("Reset all settings?") },
+            text = { Text("Calculation, location, notification and sound settings go back to defaults (Sharjah, Authority of Dubai).") },
+            confirmButton = { TextButton(onClick = { vm.resetAll(); confirmReset = false }) { Text("Reset") } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
+        )
+    }
+}

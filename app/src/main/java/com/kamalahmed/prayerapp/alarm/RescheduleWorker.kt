@@ -18,8 +18,12 @@ class RescheduleWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val scheduler: AlarmScheduler,
     private val hooks: AlarmHooks,
+    private val settings: com.kamalahmed.prayerapp.data.settings.SettingsRepository,
+    private val location: com.kamalahmed.prayerapp.core.location.LocationRepository,
 ) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
+        // Automatic location: only accepted when moved beyond the geofence (settings change re-arms alarms).
+        if (settings.current().autoLocation) runCatching { location.refresh(force = false) }
         scheduler.rescheduleAll()
         hooks.onSystemChange()
         return Result.success()
