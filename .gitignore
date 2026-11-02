@@ -12,3 +12,10 @@ build/
 keystore.properties
 *.apk
 *.aab
+# Signing secrets (never commit)
+*.p12
+*.pem
+*.pk8
+signing.properties
+*signing*.properties
+secrets/

@@ -100,6 +100,10 @@ fun PrayerAppRoot() {
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
+            val openUpdates by com.kamalahmed.prayerapp.update.UpdateNav.openRequested.collectAsStateWithLifecycle()
+            androidx.compose.runtime.LaunchedEffect(openUpdates) {
+                if (openUpdates) { com.kamalahmed.prayerapp.update.UpdateNav.openRequested.value = false; nav.navigate(SettingsDest.APP.route) }
+            }
             NavHost(nav, startDestination = TopDest.PRAYERS.route) {
                 composable(TopDest.PRAYERS.route) { PrayersScreen(trackerContent = { TodayTracker() }) }
                 composable(Routes.STREAKS) { StreaksScreen(onBack = back) }
@@ -108,7 +112,9 @@ fun PrayerAppRoot() {
                 }
                 composable(TopDest.QIBLA.route) { QiblaScreen() }
                 composable(TopDest.SETTINGS.route) {
-                    SettingsScreen(hiltViewModel(), open = { nav.navigate(it.route) }, available = availableSettings)
+                    val uvm: com.kamalahmed.prayerapp.update.UpdateViewModel = hiltViewModel()
+                    SettingsScreen(hiltViewModel(), open = { nav.navigate(it.route) }, available = availableSettings,
+                        banner = { com.kamalahmed.prayerapp.update.UpdateBanner(uvm) { nav.navigate(SettingsDest.APP.route) } })
                 }
                 composable(SettingsDest.NOTIFICATIONS.route) {
                     NotificationSettingsScreen(hiltViewModel(), onBack = back, onSound = { nav.navigate(SettingsDest.SOUND.route) })
@@ -121,7 +127,7 @@ fun PrayerAppRoot() {
                 composable(SettingsDest.IQAMA.route) { com.kamalahmed.prayerapp.ui.settings.IqamaScreen(hiltViewModel(), onBack = back) }
                 composable(SettingsDest.APP.route) {
                     val vm: com.kamalahmed.prayerapp.ui.settings.SettingsViewModel = hiltViewModel()
-                    com.kamalahmed.prayerapp.ui.settings.AppScreen(vm, onBack = back, onOnboarding = { vm.update { it.copy(onboardingDone = false) } })
+                    com.kamalahmed.prayerapp.ui.settings.AppScreen(vm, onBack = back, onOnboarding = { vm.update { it.copy(onboardingDone = false) } }, updateVm = hiltViewModel())
                 }
                 composable(SettingsDest.WIDGETS.route) { com.kamalahmed.prayerapp.ui.widgets.WidgetStudioScreen(onBack = back) }
                 composable(TopDest.MORE.route) {
@@ -131,6 +137,10 @@ fun PrayerAppRoot() {
                         onHolidays = { nav.navigate(Routes.HOLIDAYS) },
                         onWidgets = { nav.navigate(SettingsDest.WIDGETS.route) },
                         onAbout = { nav.navigate(SettingsDest.APP.route) },
+                        banner = {
+                            val uvm: com.kamalahmed.prayerapp.update.UpdateViewModel = hiltViewModel()
+                            com.kamalahmed.prayerapp.update.UpdateBanner(uvm) { nav.navigate(SettingsDest.APP.route) }
+                        },
                     )
                 }
                 composable(Routes.CALENDAR) { MonthlyCalendarScreen(onBack = { nav.popBackStack() }) }

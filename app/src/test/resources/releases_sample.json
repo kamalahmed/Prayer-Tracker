@@ -1,0 +1,36 @@
+[
+  {
+    "url": "https://api.github.com/repos/kamalahmed/Prayer-Tracker/releases/3",
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.2.0-beta.2",
+    "id": 3, "tag_name": "v0.2.0-beta.2", "name": "Prayer App 0.2.0 beta 2",
+    "draft": false, "prerelease": true, "published_at": "2026-11-20T10:00:00Z",
+    "body": "Fixes widget refresh.\r\n\r\nversionCode: 5",
+    "assets": [
+      { "name": "PrayerApp-v0.2.0-beta.2.apk", "size": 4500000, "content_type": "application/vnd.android.package-archive",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.2.0-beta.2/PrayerApp-v0.2.0-beta.2.apk" },
+      { "name": "PrayerApp-v0.2.0-beta.2.apk.sha256", "size": 99, "content_type": "text/plain",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.2.0-beta.2/PrayerApp-v0.2.0-beta.2.apk.sha256" }
+    ]
+  },
+  {
+    "id": 4, "tag_name": "v0.3.0", "name": "Draft", "draft": true, "prerelease": false, "body": null,
+    "assets": [ { "name": "PrayerApp-v0.3.0.apk", "size": 1, "content_type": "application/vnd.android.package-archive", "browser_download_url": "https://x/a.apk" } ]
+  },
+  {
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.1.1",
+    "id": 2, "tag_name": "v0.1.1", "name": "", "draft": false, "prerelease": false, "published_at": "2026-11-10T10:00:00Z",
+    "body": "Stable.\n\nSHA-256: 0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789abcdef",
+    "assets": [
+      { "name": "PrayerApp-v0.1.1.apk", "size": 4400000, "content_type": "application/vnd.android.package-archive",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.1/PrayerApp-v0.1.1.apk" }
+    ]
+  },
+  {
+    "id": 1, "tag_name": "v0.1.0-beta.1", "name": "Beta 1", "draft": false, "prerelease": true, "body": "First beta",
+    "assets": [
+      { "name": "PrayerApp-v0.1.0-beta.1.apk", "size": 4300000, "content_type": "application/vnd.android.package-archive",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.1/PrayerApp-v0.1.0-beta.1.apk" }
+    ]
+  },
+  { "id": 0, "tag_name": "notes-only", "name": "No apk", "draft": false, "prerelease": false, "body": "", "assets": [] }
+]

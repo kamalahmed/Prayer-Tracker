@@ -45,7 +45,7 @@ enum class SettingsDest(val route: String) {
 }
 
 @Composable
-fun SettingsScreen(vm: SettingsViewModel, open: (SettingsDest) -> Unit, available: Set<SettingsDest>) {
+fun SettingsScreen(vm: SettingsViewModel, open: (SettingsDest) -> Unit, available: Set<SettingsDest>, banner: @Composable () -> Unit = {}) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refreshStatus() }
     val s by vm.settings.collectAsStateWithLifecycle()
     val status by vm.status.collectAsStateWithLifecycle()
@@ -54,6 +54,7 @@ fun SettingsScreen(vm: SettingsViewModel, open: (SettingsDest) -> Unit, availabl
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Text("Settings", fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 20.dp, top = 16.dp))
+        banner()
         SectionHeader("Notification")
         CardGroup {
             ListRow("Prayer alerts & adhan", subtitle = "Per-prayer mode, full-screen, snooze, reminders", onClick = go(SettingsDest.NOTIFICATIONS))
@@ -80,7 +81,7 @@ fun SettingsScreen(vm: SettingsViewModel, open: (SettingsDest) -> Unit, availabl
                 }
             }
             RowDivider()
-            ListRow("App", subtitle = "About, onboarding, reset", onClick = go(SettingsDest.APP))
+            ListRow("App", subtitle = "About, updates, onboarding, reset", onClick = go(SettingsDest.APP))
         }
         SectionHeader("Widgets")
         CardGroup {
@@ -88,7 +89,7 @@ fun SettingsScreen(vm: SettingsViewModel, open: (SettingsDest) -> Unit, availabl
         }
         Spacer(Modifier.height(24.dp))
         Text(
-            "Prayer App 0.1.0",
+            "Prayer App ${com.kamalahmed.prayerapp.BuildConfig.VERSION_NAME}",
             style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 24.dp),
         )

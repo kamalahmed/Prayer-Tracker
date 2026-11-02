@@ -260,18 +260,19 @@ fun IqamaScreen(vm: SettingsViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun AppScreen(vm: SettingsViewModel, onBack: () -> Unit, onOnboarding: () -> Unit) {
+fun AppScreen(vm: SettingsViewModel, onBack: () -> Unit, onOnboarding: () -> Unit, updateVm: com.kamalahmed.prayerapp.update.UpdateViewModel? = null) {
     var confirmReset by remember { mutableStateOf(false) }
     SubScreen("App", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
             SectionHeader("About")
             CardGroup {
-                ListRow("Prayer App", subtitle = "Version 0.1.0 · offline prayer times, adhan, widgets and tracker")
+                ListRow("Prayer App", subtitle = "Version ${com.kamalahmed.prayerapp.BuildConfig.VERSION_NAME} · offline prayer times, adhan, widgets and tracker")
                 RowDivider()
                 ListRow("Adhan recordings", subtitle = "\"Beautiful adhan.ogg\" by Adam-synagda and \"Adhan.ogg\" by Aishatu98, Wikimedia Commons, CC0 (public domain)")
                 RowDivider()
                 ListRow("Privacy", subtitle = "No accounts, no analytics. Location stays on the device and is only used to calculate times.")
             }
+            if (updateVm != null) com.kamalahmed.prayerapp.update.UpdateSection(updateVm)
             SectionHeader("Manage")
             CardGroup {
                 ListRow("Show onboarding again", onClick = onOnboarding)

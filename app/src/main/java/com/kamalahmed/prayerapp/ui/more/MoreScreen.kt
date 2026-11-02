@@ -28,9 +28,11 @@ fun MoreScreen(
     onHolidays: () -> Unit,
     onWidgets: (() -> Unit)?,
     onAbout: (() -> Unit)?,
+    banner: @Composable () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Text("More", fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 12.dp))
+        banner()
         CardGroup {
             ListRow("Prayer tracker & streaks", leading = Icons.Filled.LocalFireDepartment, onClick = onStreaks)
             RowDivider()

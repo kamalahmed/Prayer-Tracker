@@ -13,6 +13,7 @@ To resume: `git tag -l 'phase-*'`, check out the latest, and continue with the n
 | 6 – Widgets (Glance, 6 types, config screen) | `phase-6-widgets` | ✅ Done |
 | 7 – Settings completion & polish, onboarding | `phase-7-settings` | ✅ Done |
 | 8 – Hardening, lint, release config, README | `v0.1.0` | ✅ Done |
+| 9 – In-app updater (GitHub Releases), release signing, versioning | `phase-9-updater` | ✅ Done |
 
 ## Toolchain used
 - JDK 17 (Temurin), Gradle 8.14.3 (wrapper), AGP 8.13, Kotlin 2.2.20, compileSdk/targetSdk 36, minSdk 26.
@@ -24,5 +25,12 @@ To resume: `git tag -l 'phase-*'`, check out the latest, and continue with the n
 - Emulator smoke (API 34, software GPU): debug APK installs, launches to onboarding, no app crash. Not tested on a real device; adhan playback, alarms in Doze and widgets on a launcher are unverified on hardware.
 - Note: USE_EXACT_ALARM is restricted by Google Play to alarm/clock-type apps; be ready to justify it or drop it and rely on SCHEDULE_EXACT_ALARM.
 
+## Phase 9 results (2026-11-02)
+- `update/` package: SemVer + VersionCompare, ReleaseParser (org.json), UpdateManager (ETag-cached GitHub API check, rate-limit/offline handling, resumable cancelable download with size + SHA-256 verification, PackageInstaller session install), InstallReceiver (pending-user-action and status callbacks), UpdateWorker (daily, Wi-Fi-only option, notification), UpdatePrefs, Settings > App "Updates" section and an update banner on Settings and More.
+- Manifest: REQUEST_INSTALL_PACKAGES, ACCESS_NETWORK_STATE. versionName `0.1.0-beta.1`, versionCode 2, both overridable with `-PversionName` / `-PversionCode`.
+- Release signing is read from `~/secrets/prayer-app-signing.properties` or env vars, with an unsigned fallback. The keystore lives outside the repo.
+- `assembleDebug`, `testDebugUnitTest` (45 tests, 0 failures), `lintDebug` (0 errors, 74 warnings) and a signed `assembleRelease` (R8, APK Signature Scheme v2) all pass.
+- Not yet verified on a device: the end-to-end update install. It needs a second, higher release published on GitHub.
+
 ## What's next
-v0.1.0 complete. Next: real-device testing, signing config with your own keystore, push to the private GitHub repo.
+Next: push to https://github.com/kamalahmed/Prayer-Tracker, publish the `v0.1.0-beta.1` pre-release with the APK and its .sha256, then test on a real device.

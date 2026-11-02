@@ -15,6 +15,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
@@ -55,6 +57,7 @@
             android:foregroundServiceType="mediaPlayback" />
 
         <receiver android:name=".alarm.AlarmReceiver" android:exported="false" />
+        <receiver android:name=".update.InstallReceiver" android:exported="false" />
         <receiver android:name=".tracker.MarkPrayedReceiver" android:exported="false" />
         <receiver android:name=".widget.NextPrayerReceiver" android:exported="false">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>

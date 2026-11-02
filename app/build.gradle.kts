@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,23 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+// Release signing: read from a properties file OUTSIDE the repo (or env vars). Public clones without it
+// still build; the release APK is then simply unsigned. Never commit keystores or passwords.
+val signingProps = Properties().apply {
+    val path = (findProperty("signingProps") as String?) ?: System.getenv("PRAYER_SIGNING_PROPS")
+        ?: "${System.getProperty("user.home")}/secrets/prayer-app-signing.properties"
+    val f = file(path)
+    if (f.isFile) f.inputStream().use { load(it) }
+}
+fun signingValue(key: String, env: String): String? = System.getenv(env)?.takeIf { it.isNotBlank() } ?: signingProps.getProperty(key)
+val releaseStoreFile = signingValue("storeFile", "PRAYER_KEYSTORE")
+val hasReleaseSigning = releaseStoreFile != null && file(releaseStoreFile).isFile &&
+    signingValue("storePassword", "PRAYER_KEYSTORE_PASSWORD") != null
+
+// Overridable for release cutting: ./gradlew assembleRelease -PversionName=0.2.0-beta.1 -PversionCode=3
+val appVersionName = (findProperty("versionName") as String?) ?: "0.1.0-beta.1"
+val appVersionCode = (findProperty("versionCode") as String?)?.toInt() ?: 2
 
 android {
     namespace = "com.kamalahmed.prayerapp"
@@ -14,13 +33,26 @@ android {
         applicationId = "com.kamalahmed.prayerapp"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
+        buildConfigField("String", "UPDATE_REPO", "\"kamalahmed/Prayer-Tracker\"")
         vectorDrawables.useSupportLibrary = true
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = signingValue("storePassword", "PRAYER_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "PRAYER_KEY_ALIAS") ?: "prayerapp"
+                keyPassword = signingValue("keyPassword", "PRAYER_KEY_PASSWORD") ?: signingValue("storePassword", "PRAYER_KEYSTORE_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -30,7 +62,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     testOptions { unitTests.isReturnDefaultValues = true }
     lint {
         abortOnError = true
@@ -80,4 +112,5 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    testImplementation("org.json:json:20250517")
 }

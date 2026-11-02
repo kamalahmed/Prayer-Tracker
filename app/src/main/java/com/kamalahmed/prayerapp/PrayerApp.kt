@@ -25,6 +25,7 @@ class PrayerApp : Application(), Configuration.Provider {
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var scheduler: AlarmScheduler
     @Inject lateinit var hooks: AlarmHooks
+    @Inject lateinit var updatePrefs: com.kamalahmed.prayerapp.update.UpdatePrefs
     @Inject lateinit var tracker: com.kamalahmed.prayerapp.tracker.TrackerRepository
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -36,6 +37,8 @@ class PrayerApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         Channels.create(this)
+        com.kamalahmed.prayerapp.update.UpdateWorker.createChannel(this)
+        com.kamalahmed.prayerapp.update.UpdateWorker.schedule(this, updatePrefs.autoCheck.value, updatePrefs.wifiOnly.value)
         RescheduleWorker.enqueue(this)
         // Any settings change (method, location, modes, reminders…) re-arms alarms and refreshes widgets.
         appScope.launch {
