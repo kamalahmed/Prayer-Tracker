@@ -91,6 +91,10 @@ class AlarmReceiver : BroadcastReceiver() {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setWhen(prayerTime).setShowWhen(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .apply {
+                if (prayer.isPrayer) addAction(0, "Prayed ✓",
+                    com.kamalahmed.prayerapp.tracker.MarkPrayedReceiver.pendingIntent(ctx, prayer, prayerTime, NotificationIds.prayer(prayer.ordinal)))
+            }
 
     companion object {
         const val STALE_MS = 30 * 60_000L

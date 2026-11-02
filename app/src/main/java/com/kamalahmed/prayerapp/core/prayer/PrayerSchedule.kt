@@ -9,6 +9,8 @@ data class PrayerEvent(val prayer: Prayer, val time: ZonedDateTime)
 /** Helpers for "which prayer is next / current" across day boundaries. */
 class PrayerSchedule(private val params: CalcParams) {
 
+    val zone get() = params.zone
+
     private val cache = HashMap<LocalDate, PrayerDay>()
 
     fun day(date: LocalDate): PrayerDay = cache.getOrPut(date) { PrayerTimesCalculator.calculate(date, params) }
@@ -26,6 +28,12 @@ class PrayerSchedule(private val params: CalcParams) {
 
     fun current(now: ZonedDateTime, includeSunrise: Boolean = false): PrayerEvent =
         around(now, includeSunrise).last { !it.time.isAfter(now) }
+
+    /** Prayers (incl. Sunrise if asked) of the local day of [now] whose start time has passed. */
+    fun passedToday(now: ZonedDateTime): List<Prayer> {
+        val d = day(now.withZoneSameInstant(params.zone).toLocalDate())
+        return d.times.filter { it.key.isPrayer && !it.value.isAfter(now) }.keys.toList()
+    }
 
     /** Upcoming events strictly after [now], up to [count]. */
     fun upcoming(now: ZonedDateTime, count: Int, includeSunrise: Boolean = true): List<PrayerEvent> {

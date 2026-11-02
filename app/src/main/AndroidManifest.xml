@@ -55,6 +55,7 @@
             android:foregroundServiceType="mediaPlayback" />
 
         <receiver android:name=".alarm.AlarmReceiver" android:exported="false" />
+        <receiver android:name=".tracker.MarkPrayedReceiver" android:exported="false" />
 
         <receiver android:name=".alarm.BootReceiver" android:exported="true">
             <intent-filter>

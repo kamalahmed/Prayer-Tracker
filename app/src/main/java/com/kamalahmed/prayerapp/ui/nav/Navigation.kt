@@ -25,7 +25,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.kamalahmed.prayerapp.ui.screens.PlaceholderScreen
+import com.kamalahmed.prayerapp.ui.more.MoreScreen
+import com.kamalahmed.prayerapp.ui.streaks.StreaksScreen
+import com.kamalahmed.prayerapp.ui.streaks.TodayTracker
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.kamalahmed.prayerapp.ui.settings.NotificationSettingsScreen
 import com.kamalahmed.prayerapp.ui.settings.SettingsDest
@@ -52,6 +54,7 @@ val availableSettings = setOf(SettingsDest.NOTIFICATIONS, SettingsDest.SOUND, Se
 object Routes {
     const val CALENDAR = "calendar"
     const val HOLIDAYS = "holidays"
+    const val STREAKS = "streaks"
 }
 
 @Composable
@@ -88,7 +91,8 @@ fun PrayerAppRoot() {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             NavHost(nav, startDestination = TopDest.PRAYERS.route) {
-                composable(TopDest.PRAYERS.route) { PrayersScreen() }
+                composable(TopDest.PRAYERS.route) { PrayersScreen(trackerContent = { TodayTracker() }) }
+                composable(Routes.STREAKS) { StreaksScreen(onBack = back) }
                 composable(TopDest.TIMES.route) {
                     TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) })
                 }
@@ -101,7 +105,15 @@ fun PrayerAppRoot() {
                 }
                 composable(SettingsDest.SOUND.route) { SoundSettingsScreen(hiltViewModel(), onBack = back) }
                 composable(SettingsDest.SYSTEM.route) { SystemScreen(hiltViewModel(), onBack = back) }
-                composable(TopDest.MORE.route) { PlaceholderScreen("More") }
+                composable(TopDest.MORE.route) {
+                    MoreScreen(
+                        onStreaks = { nav.navigate(Routes.STREAKS) },
+                        onCalendar = { nav.navigate(Routes.CALENDAR) },
+                        onHolidays = { nav.navigate(Routes.HOLIDAYS) },
+                        onWidgets = null,
+                        onAbout = null,
+                    )
+                }
                 composable(Routes.CALENDAR) { MonthlyCalendarScreen(onBack = { nav.popBackStack() }) }
                 composable(Routes.HOLIDAYS) { HolidaysScreen(onBack = { nav.popBackStack() }) }
             }
