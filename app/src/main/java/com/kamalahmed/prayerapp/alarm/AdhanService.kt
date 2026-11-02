@@ -71,6 +71,7 @@ class AdhanService : Service() {
         val prayer = intent?.getStringExtra(EXTRA_PRAYER)?.let { n -> Prayer.entries.firstOrNull { it.name == n } }
         val time = intent?.getLongExtra(EXTRA_TIME, System.currentTimeMillis()) ?: System.currentTimeMillis()
         val preview = intent?.action == ACTION_PREVIEW
+        triedFallback = false
         val info = PlayingInfo(prayer, time, preview)
         // Must call startForeground promptly.
         Channels.create(this)
