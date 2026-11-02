@@ -38,6 +38,28 @@ class StreaksViewModel @Inject constructor(
         StreaksUi(today, data[today].orEmpty(), passed, StreakCalculator.compute(data, today, passed))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val period = kotlinx.coroutines.flow.MutableStateFlow(com.kamalahmed.prayerapp.tracker.StatsPeriod.WEEK)
+    val anchor = kotlinx.coroutines.flow.MutableStateFlow<LocalDate?>(null)
+
+    val report: StateFlow<com.kamalahmed.prayerapp.tracker.PeriodReport?> =
+        combine(tracker.all, prayers.schedule, period, anchor) { data, sched, per, anc ->
+            val now = ZonedDateTime.now(sched.zone)
+            val today = now.toLocalDate()
+            com.kamalahmed.prayerapp.tracker.Stats.report(data, per, anc ?: today, today, sched.passedToday(now))
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val streakHistory: StateFlow<List<com.kamalahmed.prayerapp.tracker.StreakRun>> =
+        combine(tracker.all, prayers.schedule) { data, _ -> com.kamalahmed.prayerapp.tracker.Stats.streakHistory(data) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun setPeriod(p: com.kamalahmed.prayerapp.tracker.StatsPeriod) { period.value = p; anchor.value = null }
+    fun shift(by: Long) {
+        val today = state.value?.today ?: LocalDate.now()
+        val next = com.kamalahmed.prayerapp.tracker.Stats.shift(period.value, anchor.value ?: today, by)
+        anchor.value = if (next.isAfter(today)) null else next
+    }
+    fun set(date: LocalDate, p: Prayer, status: PrayerStatus?) = viewModelScope.launch { tracker.set(date, p, status) }
+
     val history: StateFlow<com.kamalahmed.prayerapp.tracker.TrackerData> =
         tracker.all.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 

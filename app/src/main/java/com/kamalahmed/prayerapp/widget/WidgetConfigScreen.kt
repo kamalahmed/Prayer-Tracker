@@ -62,9 +62,9 @@ import kotlin.math.roundToInt
 
 fun previewSize(kind: WidgetKind): DpSize = when (kind) {
     WidgetKind.NEXT_SMALL -> DpSize(170.dp, 170.dp)
-    WidgetKind.ALL_WIDE -> DpSize(320.dp, 110.dp)
+    WidgetKind.ALL_WIDE -> DpSize(320.dp, 140.dp)
     WidgetKind.NEXT_STREAK -> DpSize(290.dp, 165.dp)
-    WidgetKind.TRACKER -> DpSize(320.dp, 120.dp)
+    WidgetKind.TRACKER -> DpSize(320.dp, 140.dp)
     WidgetKind.LARGE -> DpSize(320.dp, 330.dp)
     WidgetKind.MINIMAL -> DpSize(300.dp, 64.dp)
 }
@@ -164,8 +164,16 @@ fun WidgetConfigScreen(
                 SectionHeader("Layout")
                 CardGroup {
                     SliderRow("Corner radius", style.corner.toFloat(), 0f..40f, "${style.corner} dp") { set { copy(corner = it.roundToInt()) } }
-                    SliderRow("Padding", style.padding.toFloat(), 0f..32f, "${style.padding} dp") { set { copy(padding = it.roundToInt()) } }
-                    SliderRow("Spacing", style.spacing.toFloat(), 0f..24f, "${style.spacing} dp") { set { copy(spacing = it.roundToInt()) } }
+                    SliderRow("Vertical padding (top/bottom)", style.padV.toFloat(), 0f..32f, "${style.padV} dp") { set { copy(padV = it.roundToInt()) } }
+                    SliderRow("Horizontal padding (start/end)", style.padH.toFloat(), 0f..32f, "${style.padH} dp") { set { copy(padH = it.roundToInt()) } }
+                    SliderRow("Spacing between items", style.spacing.toFloat(), 0f..24f, "${style.spacing} dp") { set { copy(spacing = it.roundToInt()) } }
+                    RowDivider()
+                    Text("Position in cell", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+                    Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        WidgetAlign.entries.forEach { a ->
+                            FilterChip(selected = style.align == a, onClick = { set { copy(align = a) } }, label = { Text(a.label) })
+                        }
+                    }
                     SliderRow("Box size", style.boxScale, 0.6f..1.5f, pct(style.boxScale)) { set { copy(boxScale = step(it)) } }
                 }
 

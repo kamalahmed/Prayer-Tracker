@@ -8,8 +8,9 @@ Defaults: Sharjah, UAE, using the Authority of Dubai calculation method.
 - Shows the Hijri date, a Qibla compass, a monthly times table, and auto location with a geofence. You can also search for a city manually.
 - Adhan alarms use exact alarms and a foreground playback service. Each prayer can use the bundled adhan, a system ringtone or a custom sound file, and the full length of the sound plays.
 - Full-screen alarm notifications are optional and turned on in Settings.
-- Prayer tracker with streaks, backed by Room. You can mark a prayer from the notification ("Prayed ✓") or from a widget.
-- Six home-screen widgets: Next, Wide, Streak, Tracker, Large and Minimal. Each widget has its own style settings for theme, transparency, spacing, text size and accent. The countdown ticks live, and Widget Studio shows a live preview.
+- **Streaks tab** (bottom navigation: Prayers · Times · Streaks · Qibla · Settings): current/best streak, today's tracker, and a Week / Month / Year statistics report with prev/next navigation. It shows prayed vs missed and on time vs late with completion %, a stacked bar chart with a completion trend line, a most-missed ranking with per-prayer on-time rate, the change vs the previous period, a calendar heatmap (tap any past day to backfill or edit it), streak history and insights. Tracking is backed by Room; mark prayers from the notification ("Prayed ✓"), a widget or the app. Unmarked prayers count as missed only once their time has passed, and only from the first tracked day.
+- **Nearby masjids** (Times tab): found automatically around your saved/GPS location from OpenStreetMap via the free Overpass API (no key, no Google Maps), sorted by distance, cached 24 h per ~1 km cell, with two fallback servers. Tap one to open it in your maps app.
+- Six home-screen widgets: Next, Wide, Streak, Tracker, Large and Minimal. Each widget has its own style settings for theme, transparency (0 % = no background at all), vertical padding, horizontal padding, spacing between items, position in the cell (top/center/bottom), text/icon/box size and accent. The background panel wraps the content, so a tall cell no longer shows an empty tinted area. Row widgets can be 1 cell tall. The countdown ticks live, and Widget Studio shows a live preview.
 - Onboarding walks through location, notifications, exact alarm, battery and full-screen permissions.
 
 ## Build
@@ -67,12 +68,16 @@ Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) an
 | RECEIVE_BOOT_COMPLETED | Reschedule after reboot, app update, time or timezone change |
 | WAKE_LOCK, VIBRATE | Alarm delivery |
 | REQUEST_IGNORE_BATTERY_OPTIMIZATIONS | Optional, asked in onboarding so alarms are reliable |
-| INTERNET | City search (geocoding) |
+| INTERNET | City search (geocoding), nearby masjids (OpenStreetMap Overpass), update checks |
 
 ## Attribution
 The bundled adhan recordings are public domain (CC0) and come from Wikimedia Commons:
 - "Beautiful adhan.ogg" by Adam-synagda
 - "Adhan.ogg" by Aishatu98
 
+Masjid data © OpenStreetMap contributors (ODbL).
+
 ## Development
-Work was built in phases, and each phase has an annotated tag (`phase-1-scaffold` … `phase-8-hardening`, then `v0.1.0`, `phase-9-updater`). See PROGRESS.md.
+Work was built in phases, and each phase has an annotated tag (`phase-1-scaffold` … `phase-8-hardening`, then `v0.1.0`, `phase-9-updater`, `phase-10-feedback`). See PROGRESS.md.
+
+Widget rendering tests (real Glance → RemoteViews → bitmap, on an emulator): `./gradlew connectedDebugAndroidTest`.

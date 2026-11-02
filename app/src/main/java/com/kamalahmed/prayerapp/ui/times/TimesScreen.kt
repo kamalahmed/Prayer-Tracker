@@ -66,12 +66,12 @@ fun NotifyMode.icon() = when (this) {
 fun TimesScreen(
     onCalendar: () -> Unit,
     onHolidays: () -> Unit,
+    onMasjids: () -> Unit,
     vm: TimesViewModel = hiltViewModel(),
 ) {
     val st by vm.state.collectAsStateWithLifecycle()
     val s = st ?: return
     val ctx = LocalContext.current
-    var masjidDialog by remember { mutableStateOf(false) }
     val use24 = s.settings.use24h
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -125,59 +125,10 @@ fun TimesScreen(
             RowDivider()
             ListRow("Islamic Holidays", leading = Icons.Filled.Celebration, onClick = onHolidays)
             RowDivider()
-            ListRow(
-                "Masjid Location",
-                subtitle = s.settings.masjidName.ifBlank { "Find nearby masjids" },
-                leading = Icons.Filled.LocationOn,
-                onClick = { openMasjid(ctx, s.settings.masjidName, s.settings.masjidLat, s.settings.masjidLng, s.settings.latitude, s.settings.longitude) },
-            ) {
-                TextButton(onClick = { masjidDialog = true }) { Text("Set") }
-            }
+            ListRow("Nearby Masjids", subtitle = "Found automatically from OpenStreetMap", leading = Icons.Filled.LocationOn, onClick = onMasjids)
         }
         Spacer(Modifier.height(24.dp))
     }
 
-    if (masjidDialog) {
-        var name by remember { mutableStateOf(s.settings.masjidName) }
-        var coords by remember {
-            mutableStateOf(if (s.settings.masjidLat != null) "${s.settings.masjidLat}, ${s.settings.masjidLng}" else "")
-        }
-        AlertDialog(
-            onDismissRequest = { masjidDialog = false },
-            title = { Text("Masjid location") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(name, { name = it }, label = { Text("Masjid name") }, singleLine = true)
-                    OutlinedTextField(coords, { coords = it }, label = { Text("Coordinates (lat, lng) – optional") }, singleLine = true)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val parts = coords.split(",").mapNotNull { it.trim().toDoubleOrNull() }
-                    vm.setMasjid(name.trim(), parts.getOrNull(0), parts.getOrNull(1))
-                    masjidDialog = false
-                }) { Text("Save") }
-            },
-            dismissButton = { TextButton(onClick = { masjidDialog = false }) { Text("Cancel") } },
-        )
-    }
 }
 
-/** Opens the masjid in any maps app via a geo: URI (falls back to a web maps link). */
-fun openMasjid(ctx: Context, name: String, lat: Double?, lng: Double?, myLat: Double, myLng: Double) {
-    val geo = when {
-        lat != null && lng != null -> "geo:$lat,$lng?q=$lat,$lng(${Uri.encode(name.ifBlank { "Masjid" })})"
-        name.isNotBlank() -> "geo:$myLat,$myLng?q=${Uri.encode(name)}"
-        else -> "geo:$myLat,$myLng?q=${Uri.encode("masjid")}"
-    }
-    try {
-        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(geo)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    } catch (_: ActivityNotFoundException) {
-        val q = if (lat != null && lng != null) "$lat,$lng" else Uri.encode(name.ifBlank { "masjid near me" })
-        try {
-            ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")))
-        } catch (_: ActivityNotFoundException) {
-            Toast.makeText(ctx, "No maps app found", Toast.LENGTH_SHORT).show()
-        }
-    }
-}

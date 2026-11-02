@@ -13,6 +13,9 @@ enum class WidgetKind(val label: String, val description: String) {
 
 enum class WidgetTheme(val label: String) { GLASS("Glass"), SOLID("Solid"), MINIMAL("Minimal"), GRADIENT("Gradient"), LIGHT("Light") }
 
+/** Where the background panel sits inside a taller/wider widget cell. */
+enum class WidgetAlign(val label: String) { TOP("Top"), CENTER("Center"), BOTTOM("Bottom") }
+
 enum class WidgetWeight(val label: String) { NORMAL("Regular"), MEDIUM("Medium"), BOLD("Bold") }
 
 /** Follow the app setting, or force on/off. */
@@ -38,8 +41,13 @@ data class WidgetStyle(
     /** Background alpha 0..100 (real ARGB alpha; no blur). */
     val opacity: Int = 80,
     val corner: Int = 20,
-    val padding: Int = 12,
+    /** Top/bottom padding inside the panel (dp, 0..32). */
+    val padV: Int = 10,
+    /** Start/end padding inside the panel (dp, 0..32). */
+    val padH: Int = 12,
+    /** Spacing between items (dp, 0..24). */
     val spacing: Int = 6,
+    val align: WidgetAlign = WidgetAlign.CENTER,
     val textScale: Float = 1f,
     val iconScale: Float = 1f,
     val boxScale: Float = 1f,
@@ -57,8 +65,8 @@ data class WidgetStyle(
     fun abbr(app: Boolean) = when (abbreviations) { Tri.APP -> app; Tri.ON -> true; Tri.OFF -> false }
 
     fun encode(): String = listOf(
-        "v" to "1", "theme" to theme.name, "accent" to accent.toString(), "opacity" to opacity.toString(),
-        "corner" to corner.toString(), "padding" to padding.toString(), "spacing" to spacing.toString(),
+        "v" to "2", "theme" to theme.name, "accent" to accent.toString(), "opacity" to opacity.toString(),
+        "corner" to corner.toString(), "padv" to padV.toString(), "padh" to padH.toString(), "spacing" to spacing.toString(), "align" to align.name,
         "text" to fmt(textScale), "icon" to fmt(iconScale), "box" to fmt(boxScale), "weight" to weight.name,
         "hijri" to b(showHijri), "countdown" to b(showCountdown), "icons" to b(showIcons), "ampm" to b(showAmPm),
         "sunrise" to b(showSunrise), "midnight" to b(showMidnight), "clock" to clock24.name, "abbr" to abbreviations.name,
@@ -66,7 +74,7 @@ data class WidgetStyle(
 
     /** Values clamped into their valid ranges. */
     fun sanitized() = copy(
-        opacity = opacity.coerceIn(0, 100), corner = corner.coerceIn(0, 40), padding = padding.coerceIn(0, 32),
+        opacity = opacity.coerceIn(0, 100), corner = corner.coerceIn(0, 40), padV = padV.coerceIn(0, 32), padH = padH.coerceIn(0, 32),
         spacing = spacing.coerceIn(0, 24), textScale = textScale.coerceIn(0.6f, 1.8f),
         iconScale = iconScale.coerceIn(0.5f, 1.8f), boxScale = boxScale.coerceIn(0.6f, 1.5f),
     )
@@ -81,7 +89,7 @@ data class WidgetStyle(
             WidgetKind.NEXT_STREAK -> WidgetStyle()
             WidgetKind.TRACKER -> WidgetStyle(abbreviations = Tri.ON, showAmPm = false)
             WidgetKind.LARGE -> WidgetStyle(theme = WidgetTheme.SOLID, opacity = 92, showSunrise = true)
-            WidgetKind.MINIMAL -> WidgetStyle(theme = WidgetTheme.MINIMAL, opacity = 0, padding = 4, showIcons = false)
+            WidgetKind.MINIMAL -> WidgetStyle(theme = WidgetTheme.MINIMAL, opacity = 0, padV = 4, padH = 4, showIcons = false)
         }
 
         /** Tolerant decoder: unknown/missing keys fall back to the kind's defaults. */
@@ -97,7 +105,10 @@ data class WidgetStyle(
                 accent = int("accent", d.accent),
                 opacity = int("opacity", d.opacity),
                 corner = int("corner", d.corner),
-                padding = int("padding", d.padding),
+                // v1 stored a single "padding" for all sides.
+                padV = int("padv", int("padding", d.padV)),
+                padH = int("padh", int("padding", d.padH)),
+                align = WidgetAlign.entries.firstOrNull { it.name == m["align"] } ?: d.align,
                 spacing = int("spacing", d.spacing),
                 textScale = float("text", d.textScale),
                 iconScale = float("icon", d.iconScale),
@@ -129,7 +140,10 @@ data class WidgetPalette(
     val danger: Int,
 ) {
     companion object {
-        fun withAlpha(c: Int, alpha: Float): Int = ((alpha.coerceIn(0f, 1f) * 255).toInt() shl 24) or (c and 0xFFFFFF)
+        fun withAlpha(c: Int, alpha: Float): Int = (Math.round(alpha.coerceIn(0f, 1f) * 255) shl 24) or (c and 0xFFFFFF)
+
+        /** Background alpha byte for an opacity percentage: 0 -> 0 (fully transparent), 100 -> 255, linear between. */
+        fun alphaFor(opacityPct: Int): Int = Math.round(opacityPct.coerceIn(0, 100) * 255 / 100f)
 
         fun mix(a: Int, b: Int, t: Float): Int {
             fun ch(c: Int, s: Int) = (c shr s) and 0xFF
@@ -138,7 +152,8 @@ data class WidgetPalette(
         }
 
         fun of(style: WidgetStyle): WidgetPalette {
-            val a = style.opacity / 100f
+            val a = alphaFor(style.opacity) / 255f
+            val noBg = style.opacity <= 0
             val light = style.theme == WidgetTheme.LIGHT
             val text = if (light) 0xFF15171A.toInt() else 0xFFFFFFFF.toInt()
             val accent = if (light && style.accent == AccentPalette.last().argb) 0xFF2E7D32.toInt() else style.accent
@@ -156,11 +171,22 @@ data class WidgetPalette(
                 text = text,
                 sub = withAlpha(text, 0.62f),
                 accent = accentReadable,
-                highlight = withAlpha(accent, if (light) 0.18f else 0.24f),
+                // At opacity 0 every background layer (panel, next-prayer pill, hijri badge) is removed.
+                highlight = if (noBg) 0 else withAlpha(accent, if (light) 0.18f else 0.24f),
                 gold = if (light) 0xFFB26B00.toInt() else 0xFFE6A23C.toInt(),
-                badge = withAlpha(text, if (light) 0.08f else 0.14f),
+                badge = if (noBg) 0 else withAlpha(text, if (light) 0.08f else 0.14f),
                 danger = 0xFFE5534B.toInt(),
             )
+        }
+    }
+}
+
+/** Resolved dimensions (dp) used by the widget layouts; pure so it can be unit tested. */
+data class WidgetDims(val padTop: Int, val padBottom: Int, val padStart: Int, val padEnd: Int, val gap: Int, val cellPad: Int, val hasBackground: Boolean) {
+    companion object {
+        fun of(style: WidgetStyle): WidgetDims {
+            val s = style.sanitized()
+            return WidgetDims(s.padV, s.padV, s.padH, s.padH, s.spacing, s.spacing / 2, s.opacity > 0)
         }
     }
 }

@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.List
@@ -27,7 +27,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.kamalahmed.prayerapp.ui.more.MoreScreen
 import com.kamalahmed.prayerapp.ui.streaks.StreaksScreen
 import com.kamalahmed.prayerapp.ui.streaks.TodayTracker
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,9 +45,9 @@ import com.kamalahmed.prayerapp.ui.theme.Card
 enum class TopDest(val route: String, val label: String, val icon: ImageVector) {
     PRAYERS("prayers", "Prayers", Icons.Filled.History),
     TIMES("times", "Times", Icons.AutoMirrored.Filled.List),
+    STREAKS("streaks", "Streaks", Icons.Filled.LocalFireDepartment),
     QIBLA("qibla", "Qibla", Icons.Filled.Navigation),
     SETTINGS("settings", "Settings", Icons.Filled.Settings),
-    MORE("more", "More", Icons.Filled.MoreHoriz),
 }
 
 val availableSettings = SettingsDest.entries.toSet()
@@ -56,7 +55,7 @@ val availableSettings = SettingsDest.entries.toSet()
 object Routes {
     const val CALENDAR = "calendar"
     const val HOLIDAYS = "holidays"
-    const val STREAKS = "streaks"
+    const val MASJIDS = "masjids"
 }
 
 @Composable
@@ -106,9 +105,10 @@ fun PrayerAppRoot() {
             }
             NavHost(nav, startDestination = TopDest.PRAYERS.route) {
                 composable(TopDest.PRAYERS.route) { PrayersScreen(trackerContent = { TodayTracker() }) }
-                composable(Routes.STREAKS) { StreaksScreen(onBack = back) }
+                composable(TopDest.STREAKS.route) { StreaksScreen() }
+                composable(Routes.MASJIDS) { com.kamalahmed.prayerapp.masjid.MasjidScreen(onBack = back) }
                 composable(TopDest.TIMES.route) {
-                    TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) })
+                    TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) }, onMasjids = { nav.navigate(Routes.MASJIDS) })
                 }
                 composable(TopDest.QIBLA.route) { QiblaScreen() }
                 composable(TopDest.SETTINGS.route) {
@@ -130,19 +130,6 @@ fun PrayerAppRoot() {
                     com.kamalahmed.prayerapp.ui.settings.AppScreen(vm, onBack = back, onOnboarding = { vm.update { it.copy(onboardingDone = false) } }, updateVm = hiltViewModel())
                 }
                 composable(SettingsDest.WIDGETS.route) { com.kamalahmed.prayerapp.ui.widgets.WidgetStudioScreen(onBack = back) }
-                composable(TopDest.MORE.route) {
-                    MoreScreen(
-                        onStreaks = { nav.navigate(Routes.STREAKS) },
-                        onCalendar = { nav.navigate(Routes.CALENDAR) },
-                        onHolidays = { nav.navigate(Routes.HOLIDAYS) },
-                        onWidgets = { nav.navigate(SettingsDest.WIDGETS.route) },
-                        onAbout = { nav.navigate(SettingsDest.APP.route) },
-                        banner = {
-                            val uvm: com.kamalahmed.prayerapp.update.UpdateViewModel = hiltViewModel()
-                            com.kamalahmed.prayerapp.update.UpdateBanner(uvm) { nav.navigate(SettingsDest.APP.route) }
-                        },
-                    )
-                }
                 composable(Routes.CALENDAR) { MonthlyCalendarScreen(onBack = { nav.popBackStack() }) }
                 composable(Routes.HOLIDAYS) { HolidaysScreen(onBack = { nav.popBackStack() }) }
             }

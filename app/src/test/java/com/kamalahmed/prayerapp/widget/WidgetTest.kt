@@ -21,7 +21,7 @@ class WidgetTest {
     private fun at(h: Int, m: Int) = ZonedDateTime.of(day.atTime(h, m), zone)
 
     @Test fun styleRoundTrip() {
-        val s = WidgetStyle(theme = WidgetTheme.GRADIENT, accent = AccentPalette[3].argb, opacity = 42, corner = 7, padding = 3,
+        val s = WidgetStyle(theme = WidgetTheme.GRADIENT, accent = AccentPalette[3].argb, opacity = 42, corner = 7, padV = 3, padH = 5, align = WidgetAlign.BOTTOM,
             spacing = 9, textScale = 1.25f, iconScale = 0.75f, boxScale = 1.1f, weight = WidgetWeight.BOLD, showHijri = false,
             showCountdown = false, showIcons = false, showAmPm = false, showSunrise = true, showMidnight = true,
             clock24 = Tri.ON, abbreviations = Tri.OFF)
@@ -43,7 +43,7 @@ class WidgetTest {
 
     @Test fun paletteOpacityIsRealAlpha() {
         val p = WidgetPalette.of(WidgetStyle(theme = WidgetTheme.SOLID, opacity = 50))
-        assertEquals(127, (p.bg ushr 24) and 0xFF)
+        assertEquals(128, (p.bg ushr 24) and 0xFF)
         assertEquals(0, (WidgetPalette.of(WidgetStyle(opacity = 0)).bg ushr 24) and 0xFF)
     }
 

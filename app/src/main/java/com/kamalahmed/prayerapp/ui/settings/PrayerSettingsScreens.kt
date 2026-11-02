@@ -136,7 +136,6 @@ fun LocationScreen(vm: SettingsViewModel, onBack: () -> Unit) {
     val s = vm.settings.collectAsStateWithLifecycle().value ?: return
     Messages(vm)
     var query by rememberSaveable { mutableStateOf("") }
-    var masjid by rememberSaveable { mutableStateOf(s.masjidName) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
         if (r.values.any { it }) { vm.update { it.copy(autoLocation = true) }; vm.refreshLocation() }
         else vm.message.value = "Location permission denied – choose a city instead"
@@ -169,19 +168,6 @@ fun LocationScreen(vm: SettingsViewModel, onBack: () -> Unit) {
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                     )
                 }
-            }
-            SectionHeader("Masjid")
-            CardGroup {
-                OutlinedTextField(
-                    value = masjid, onValueChange = { masjid = it; vm.update { st -> st.copy(masjidName = it.take(60)) } },
-                    label = { Text("Masjid name (optional)") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                )
-                ListRow(
-                    "Set masjid at current location",
-                    subtitle = if (s.masjidLat != null) String.format(Locale.US, "%.4f, %.4f", s.masjidLat, s.masjidLng) else "Used for directions from the Times tab",
-                    onClick = { vm.update { it.copy(masjidLat = it.latitude, masjidLng = it.longitude) } },
-                )
             }
             SectionHeader("Choose a city")
             CardGroup {

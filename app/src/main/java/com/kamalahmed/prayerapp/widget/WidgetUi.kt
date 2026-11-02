@@ -84,16 +84,28 @@ class WidgetUiState(val style: WidgetStyle, val data: WidgetData, val interactiv
 @Composable
 fun WidgetContent(kind: WidgetKind, style: WidgetStyle, data: WidgetData, interactive: Boolean = true) {
     val ui = WidgetUiState(style, data, interactive)
-    var root = GlanceModifier.fillMaxSize().then(backgroundModifier(ui)).padding(style.padding.dp)
+    val dims = WidgetDims.of(style)
+    // Root: full cell, always fully transparent. Only the inner panel (wrap-content height) gets a background,
+    // so a tall cell no longer shows a big empty tinted area above/below the content.
+    var root = GlanceModifier.fillMaxSize()
     if (interactive) root = root.clickable(actionStartActivity<MainActivity>())
-    Box(modifier = root, contentAlignment = Alignment.Center) {
-        when (kind) {
-            WidgetKind.NEXT_SMALL -> NextSmall(ui)
-            WidgetKind.ALL_WIDE -> AllWide(ui)
-            WidgetKind.NEXT_STREAK -> NextStreak(ui)
-            WidgetKind.TRACKER -> Tracker(ui)
-            WidgetKind.LARGE -> Large(ui)
-            WidgetKind.MINIMAL -> Minimal(ui)
+    val align = when (style.align) {
+        WidgetAlign.TOP -> Alignment.TopCenter
+        WidgetAlign.CENTER -> Alignment.Center
+        WidgetAlign.BOTTOM -> Alignment.BottomCenter
+    }
+    Box(modifier = root, contentAlignment = align) {
+        val panel = GlanceModifier.fillMaxWidth().then(backgroundModifier(ui))
+            .padding(start = dims.padStart.dp, end = dims.padEnd.dp, top = dims.padTop.dp, bottom = dims.padBottom.dp)
+        Box(modifier = panel) {
+            when (kind) {
+                WidgetKind.NEXT_SMALL -> NextSmall(ui)
+                WidgetKind.ALL_WIDE -> AllWide(ui)
+                WidgetKind.NEXT_STREAK -> NextStreak(ui)
+                WidgetKind.TRACKER -> Tracker(ui)
+                WidgetKind.LARGE -> Large(ui)
+                WidgetKind.MINIMAL -> Minimal(ui)
+            }
         }
     }
 }
@@ -102,13 +114,19 @@ fun WidgetContent(kind: WidgetKind, style: WidgetStyle, data: WidgetData, intera
 @Composable
 private fun backgroundModifier(ui: WidgetUiState): GlanceModifier {
     val st = ui.style
-    if (st.opacity == 0) return GlanceModifier
+    // Opacity 0: no background layer at all (no colour, bitmap, corner clip or tint).
+    if (!WidgetDims.of(st).hasBackground) return GlanceModifier
     if (st.theme != WidgetTheme.GRADIENT && Build.VERSION.SDK_INT >= 31) {
         return GlanceModifier.background(ColorProvider(Color(ui.pal.bg))).cornerRadius(st.corner.dp)
     }
     val size = LocalSize.current
     val density = LocalContext.current.resources.displayMetrics.density
-    val bmp = WidgetBitmaps.background(size.width.value, size.height.value, density, ui.pal, st.corner, st.theme == WidgetTheme.GRADIENT)
+    if (Build.VERSION.SDK_INT >= 31) {
+        // Gradient: square bitmap stretched to the panel, rounded by the system clip.
+        val bmp = WidgetBitmaps.background(size.width.value, 80f, density, ui.pal, 0, true)
+        return GlanceModifier.background(ImageProvider(bmp), ContentScale.FillBounds).cornerRadius(st.corner.dp)
+    }
+    val bmp = WidgetBitmaps.background(size.width.value, 80f, density, ui.pal, st.corner, st.theme == WidgetTheme.GRADIENT)
     return GlanceModifier.background(ImageProvider(bmp), ContentScale.FillBounds)
 }
 
@@ -145,10 +163,12 @@ private fun Countdown(ui: WidgetUiState, target: ZonedDateTime, size: Float, col
 
 @Composable
 private fun HijriBadge(ui: WidgetUiState) {
+    var bm = GlanceModifier.size(ui.box(32))
+    if (ui.pal.badge != 0) bm = bm.background(
+        ImageProvider(R.drawable.w_pill), ContentScale.FillBounds, ColorFilter.tint(ColorProvider(Color(ui.pal.badge))),
+    )
     Box(
-        modifier = GlanceModifier.size(ui.box(32)).background(
-            ImageProvider(R.drawable.w_pill), ContentScale.FillBounds, ColorFilter.tint(ColorProvider(Color(ui.pal.badge))),
-        ),
+        modifier = bm,
         contentAlignment = Alignment.Center,
     ) {
         Text("${ui.data.hijri.day}", style = ui.ts(15f, ui.pal.gold, bold = true), maxLines = 1)
@@ -208,7 +228,7 @@ private fun Streak(ui: WidgetUiState, size: Float) {
 @Composable
 private fun NextSmall(ui: WidgetUiState) {
     val d = ui.data
-    Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (ui.style.showIcons) {
                 Icon(WidgetData.icon(d.next.prayer), ui.icon(18), ui.pal.accent)
@@ -230,7 +250,7 @@ private fun NextSmall(ui: WidgetUiState) {
 private fun AllWide(ui: WidgetUiState) {
     val d = ui.data
     val compact = LocalSize.current.height < 100.dp
-    Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(d.next.prayer.displayName, style = ui.ts(16f, bold = true), maxLines = 1)
             Spacer(GlanceModifier.width(8.dp))
@@ -249,12 +269,12 @@ private fun AllWide(ui: WidgetUiState) {
 @Composable
 private fun RowScope.WideCell(ui: WidgetUiState, r: WidgetRow, showIcon: Boolean) {
     val c = if (r.isNext) ui.pal.accent else ui.pal.sub
-    var m = GlanceModifier.defaultWeight().padding(vertical = 4.dp)
-    if (r.isNext) m = m.then(highlight(ui))
+    var m = GlanceModifier.defaultWeight().padding(vertical = (ui.style.spacing / 2).dp)
+    if (r.isNext && ui.pal.highlight != 0) m = m.then(highlight(ui))
     Column(modifier = m, horizontalAlignment = Alignment.CenterHorizontally) {
         if (showIcon) {
             Icon(r.icon, ui.icon(16), c)
-            Spacer(GlanceModifier.height(2.dp))
+            Spacer(GlanceModifier.height((ui.style.spacing / 3).dp))
         }
         Text(ui.rowLabel(r), style = ui.ts(11f, c), maxLines = 1)
         Text(ui.time(r.time), style = ui.ts(13f, if (r.isNext) ui.pal.accent else ui.pal.text), maxLines = 1)
@@ -265,7 +285,7 @@ private fun RowScope.WideCell(ui: WidgetUiState, r: WidgetRow, showIcon: Boolean
 private fun NextStreak(ui: WidgetUiState) {
     val d = ui.data
     val compact = LocalSize.current.height < 130.dp
-    Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -300,7 +320,7 @@ private fun NextStreak(ui: WidgetUiState) {
 private fun Tracker(ui: WidgetUiState) {
     val d = ui.data
     val compact = LocalSize.current.height < 100.dp
-    Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Today", style = ui.ts(14f, bold = true), maxLines = 1)
             Spacer(GlanceModifier.width(6.dp))
@@ -317,7 +337,7 @@ private fun Tracker(ui: WidgetUiState) {
             Prayer.obligatory.forEach { p ->
                 Column(modifier = GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                     StatusDot(ui, p, ui.box(if (compact) 26 else 32))
-                    Text(ui.label(p), style = ui.ts(10f, ui.pal.sub), maxLines = 1, modifier = GlanceModifier.padding(top = 2.dp))
+                    Text(ui.label(p), style = ui.ts(10f, ui.pal.sub), maxLines = 1, modifier = GlanceModifier.padding(top = (ui.style.spacing / 3).dp))
                     if (!compact) d.todayTimes[p]?.let { Text(ui.time(it), style = ui.ts(10f, ui.pal.text), maxLines = 1) }
                 }
             }
@@ -332,7 +352,7 @@ private fun Large(ui: WidgetUiState) {
     val d = ui.data
     val ctx = LocalContext.current
     val ringDp = ui.box(108)
-    Column(modifier = GlanceModifier.fillMaxSize()) {
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(d.today.format(DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault())), style = ui.ts(14f, bold = true), maxLines = 1)
@@ -357,7 +377,7 @@ private fun Large(ui: WidgetUiState) {
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Streak(ui, 24f)
                 Text("day streak · best ${d.bestDays}", style = ui.ts(11f, ui.pal.sub), maxLines = 1)
-                Row(modifier = GlanceModifier.padding(top = 6.dp)) {
+                Row(modifier = GlanceModifier.padding(top = ui.gap)) {
                     Prayer.obligatory.forEach { p ->
                         Box(GlanceModifier.padding(end = 4.dp)) { StatusDot(ui, p, ui.box(22)) }
                     }
@@ -372,8 +392,8 @@ private fun Large(ui: WidgetUiState) {
 
 @Composable
 private fun LargeRow(ui: WidgetUiState, r: WidgetRow) {
-    var m = GlanceModifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = (2 + ui.style.spacing / 3).dp)
-    if (r.isNext) m = m.then(highlight(ui))
+    var m = GlanceModifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = (ui.style.spacing / 2).dp)
+    if (r.isNext && ui.pal.highlight != 0) m = m.then(highlight(ui))
     val c = when {
         r.isNext -> ui.pal.accent
         r.passed -> ui.pal.sub
@@ -393,7 +413,7 @@ private fun LargeRow(ui: WidgetUiState, r: WidgetRow) {
 @Composable
 private fun Minimal(ui: WidgetUiState) {
     val d = ui.data
-    Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (ui.style.showIcons) {
                 Icon(WidgetData.icon(d.next.prayer), ui.icon(16), ui.pal.accent)

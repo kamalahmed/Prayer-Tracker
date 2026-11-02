@@ -22,8 +22,8 @@ val hasReleaseSigning = releaseStoreFile != null && file(releaseStoreFile).isFil
     signingValue("storePassword", "PRAYER_KEYSTORE_PASSWORD") != null
 
 // Overridable for release cutting: ./gradlew assembleRelease -PversionName=0.2.0-beta.1 -PversionCode=3
-val appVersionName = (findProperty("versionName") as String?) ?: "0.1.0-beta.1"
-val appVersionCode = (findProperty("versionCode") as String?)?.toInt() ?: 2
+val appVersionName = (findProperty("versionName") as String?) ?: "0.1.0-beta.2"
+val appVersionCode = (findProperty("versionCode") as String?)?.toInt() ?: 3
 
 android {
     namespace = "com.kamalahmed.prayerapp"
@@ -37,6 +37,7 @@ android {
         versionName = appVersionName
         buildConfigField("String", "UPDATE_REPO", "\"kamalahmed/Prayer-Tracker\"")
         vectorDrawables.useSupportLibrary = true
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -111,6 +112,8 @@ dependencies {
     implementation(libs.splashscreen)
 
     testImplementation(libs.junit)
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
     testImplementation(libs.coroutines.test)
     testImplementation("org.json:json:20250517")
 }
