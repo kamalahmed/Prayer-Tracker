@@ -9,7 +9,8 @@ Defaults: Sharjah, UAE, using the Authority of Dubai calculation method.
 - Adhan alarms use exact alarms and a foreground playback service. Each prayer can use the bundled adhan, a system ringtone or a custom sound file, and the full length of the sound plays.
 - Full-screen alarm notifications are optional and turned on in Settings.
 - **Streaks tab** (bottom navigation: Prayers · Times · Streaks · Qibla · Settings): current/best streak, today's tracker, and a Week / Month / Year statistics report with prev/next navigation. It shows prayed vs missed and on time vs late with completion %, a stacked bar chart with a completion trend line, a most-missed ranking with per-prayer on-time rate, the change vs the previous period, a calendar heatmap (tap any past day to backfill or edit it), streak history and insights. Tracking is backed by Room; mark prayers from the notification ("Prayed ✓"), a widget or the app. Unmarked prayers count as missed only once their time has passed, and only from the first tracked day.
-- Six home-screen widgets: Next, Wide, Streak, Tracker, Large and Minimal. Each widget has its own style settings for theme, transparency (0 % = no background at all), vertical padding, horizontal padding, spacing between items, position in the cell (top/center/bottom), text/icon/box size and accent. The background panel wraps the content, so a tall cell no longer shows an empty tinted area. Row widgets can be 1 cell tall. The countdown ticks live, and Widget Studio shows a live preview.
+- **Tablets and foldables:** a navigation rail on wide screens, two-pane Prayers, Times and Qibla, a multi-column Streaks dashboard and Settings list-detail. Fold, unfold and rotation keep your state.
+- Six home-screen widgets: Next, Wide, Streak, Tracker, Large and Minimal. Each widget has its own style settings for theme, transparency (0 % = no background at all), vertical padding, horizontal padding, spacing between items, position in the cell (top/center/bottom), text/icon/box size and accent. The background panel wraps the content, so a tall cell no longer shows an empty tinted area. Row widgets can be 1 cell tall. "Always show full layout" keeps every prayer visible at small sizes. The countdown ticks live, and Widget Studio shows a live preview.
 - Onboarding walks through location, notifications, exact alarm, battery and full-screen permissions.
 
 ## Build
@@ -54,7 +55,7 @@ Keep the keystore backed up: every future update must be signed with the same ke
 cp app/build/outputs/apk/release/app-release.apk PrayerApp-v0.2.0-beta.1.apk
 sha256sum PrayerApp-v0.2.0-beta.1.apk > PrayerApp-v0.2.0-beta.1.apk.sha256
 ```
-Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) and attach the `.apk` and `.apk.sha256` files. Optionally add `versionCode: 3` to the notes. The tag name must be the versionName with a `v` prefix. Defaults when the properties are omitted: `0.1.0-beta.1` / `2`.
+Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) and attach the `.apk` and `.apk.sha256` files. Optionally add `versionCode: 3` to the notes. The tag name must be the versionName with a `v` prefix. Defaults when the properties are omitted: `0.1.0-beta.3` / `4`.
 
 ## Permissions
 | Permission | Why |

@@ -41,3 +41,17 @@ Next: push to https://github.com/kamalahmed/Prayer-Tracker, publish the `v0.1.0-
 - Widget opacity is linear, 0 = fully transparent (WidgetTest, WidgetRenderTest).
 - Separate padV/padH/spacing (0..), top/center/bottom alignment, transparent root with a wrap-content panel, 1-cell row widgets (WidgetDimsTest; tall 520dp render test).
 - Results: assembleDebug OK, 60 unit tests passing, lint 0 errors, connectedDebugAndroidTest 2/2 passing on the API 34 emulator.
+
+## Phase 11: Feedback (v0.1.0-beta.3, versionCode 4), tag `phase-11-feedback`
+- **Masjid locator removed** completely: code, route, settings fields, Overpass test and README mentions.
+- **Offline world cities.** `assets/cities.tsv.gz` (about 3.3 MB, 69,999 cities) is built by `tools/build_cities.py` from GeoNames `cities5000` (CC BY 4.0). Search folds accents, supports a "city, country" qualifier and ranks in tiers, with population breaking ties. Manual lat/lon entry and Automatic location are kept. Tested by `CitySearchTest` (sylhet, dhaka, sharjah, dubai, london, new york, tokyo, mecca, istanbul, karachi, jakarta, lagos, plus BD cities).
+- **Widget collapse root cause:** in beta.2, R8 merged all `GlanceAppWidget` subclasses into one class (mapping.txt showed every widget mapped to `a8.a`). Glance matches receivers to widgets by class name, so `updateAll()` for one kind re-rendered *every* widget with that kind's layout. As a result, "All prayers" became the one-prayer NextSmall layout on the boundary, hourly and screen-on updates. Resizing re-rendered through the correct receiver, which is why the widget looked fine again afterwards. It only happened in release builds.
+  - **Fix:** a keep rule for the widget classes, updates go per appWidgetId through each kind's receiver, and the kind is resolved from the appWidgetId. The beta.3 mapping shows all 7 classes as distinct and unmerged.
+  - New `WidgetLayout.compact()` with an "Always show full layout" option (`WidgetLayoutTest`).
+  - The provider XML now declares heights that match the content.
+- **Adaptive layouts:**
+  - `ui/adaptive`: size classes, rail vs bottom bar, two-pane, list-detail, dashboard columns, and a dial diameter capped at min(w, h).
+  - Two-pane Prayers, Times and Qibla, a multi-column Streaks dashboard, and Settings list-detail with the selection saved. Content width is capped at 840dp.
+  - MainActivity declares `resizeableActivity` and handles size/orientation `configChanges`, so the activity is not recreated on fold, unfold or rotation (`AdaptiveTest`).
+- **Results:** assembleDebug OK, 79 unit tests passing, lintDebug OK, signed assembleRelease. The signer cert SHA-256 matches `022ddd…481d`.
+- **Not verified on a real device:** Fold inner/outer screen switching, launcher widget frame sizes on Samsung One UI, lock-screen widget behaviour, and the adaptive layouts on real tablet hardware. Decisions were checked with unit tests only, and no emulator UI run was done this phase.

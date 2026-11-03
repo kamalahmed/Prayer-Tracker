@@ -22,8 +22,8 @@ val hasReleaseSigning = releaseStoreFile != null && file(releaseStoreFile).isFil
     signingValue("storePassword", "PRAYER_KEYSTORE_PASSWORD") != null
 
 // Overridable for release cutting: ./gradlew assembleRelease -PversionName=0.2.0-beta.1 -PversionCode=3
-val appVersionName = (findProperty("versionName") as String?) ?: "0.1.0-beta.2"
-val appVersionCode = (findProperty("versionCode") as String?)?.toInt() ?: 3
+val appVersionName = (findProperty("versionName") as String?) ?: "0.1.0-beta.3"
+val appVersionCode = (findProperty("versionCode") as String?)?.toInt() ?: 4
 
 android {
     namespace = "com.kamalahmed.prayerapp"
