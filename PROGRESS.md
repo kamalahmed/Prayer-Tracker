@@ -55,3 +55,12 @@ Next: push to https://github.com/kamalahmed/Prayer-Tracker, publish the `v0.1.0-
   - MainActivity declares `resizeableActivity` and handles size/orientation `configChanges`, so the activity is not recreated on fold, unfold or rotation (`AdaptiveTest`).
 - **Results:** assembleDebug OK, 79 unit tests passing, lintDebug OK, signed assembleRelease. The signer cert SHA-256 matches `022ddd…481d`.
 - **Not verified on a real device:** Fold inner/outer screen switching, launcher widget frame sizes on Samsung One UI, lock-screen widget behaviour, and the adaptive layouts on real tablet hardware. Decisions were checked with unit tests only, and no emulator UI run was done this phase.
+
+## Phase 12: Feedback (v0.1.0-beta.4, versionCode 5), tag `phase-12-feedback`
+- **Location crash root cause:** AGP/aapt gunzips `*.gz` assets when packaging, so the APK contains `assets/cities.tsv` and not `cities.tsv.gz`. `CityDatabase.get()` opened `cities.tsv.gz` and threw `FileNotFoundException` inside the CitySearch `produceState` coroutine, which crashed the app every time on every build type. Unit tests had read the source file directly, so they missed it.
+  - **Fix:** try `cities.tsv` and then `cities.tsv.gz`, and sniff the gzip magic bytes so either form loads. CitySearch and the manual-coordinates path now catch load failures and show a message.
+  - **Tests:** `CityAssetTest` covers the plain and gzip forms, the asset-name list, and checks that the built release APK contains an asset the code opens. The Robolectric `SettingsUiTest.citySearchLoadsPackagedAssetWithoutCrashing` uses the merged assets; it was confirmed to fail with the old asset name.
+- **Settings list-detail:** `ListRow(selected=)` adds a tinted rounded background, accent semibold title and `Selected` semantics. NOTIFICATIONS is selected by default. Tested by `SettingsUiTest`, using Robolectric with Compose ui-test.
+- **Audit:** `cities.tsv.gz` is the only asset, and no other page loads assets or uses reflection. The other Settings pages were not opened in tests, because they need Hilt ViewModels.
+- **Results:** 86 unit tests passing, lintDebug 0 errors, signed assembleRelease with signer `022ddd…481d`.
+- **Not verified on a device:** the emulator was offline, so nothing was run on hardware or the emulator this phase.
