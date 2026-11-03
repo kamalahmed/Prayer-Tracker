@@ -26,7 +26,7 @@ data class ReleaseInfo(
 /** Parses the GitHub "list releases" / "get release" JSON. Pure (org.json only) so it is unit-testable. */
 object ReleaseParser {
     private val SHA_RX = Regex("""(?i)sha-?256[^0-9a-f]{0,40}([0-9a-f]{64})""")
-    private val CODE_RX = Regex("""(?i)version\s*code\s*[:=]?\s*(\d{1,9})""")
+    private val CODE_RX = Regex("""(?i)version\s*code\s*[:=]?\s*(\d{1,9})(?!\d)""")
     private val HEX64 = Regex("""\b([0-9a-fA-F]{64})\b""")
 
     fun parseList(json: String): List<ReleaseInfo> {
