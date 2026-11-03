@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.kamalahmed.prayerapp.core.safety.reportErrors
 import javax.inject.Inject
 
 @HiltViewModel
@@ -30,14 +31,14 @@ class SettingsViewModel @Inject constructor(
     private val location: LocationRepository,
 ) : AndroidViewModel(app) {
 
-    val settings: StateFlow<AppSettings?> = repo.settings.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    val settings: StateFlow<AppSettings?> = repo.settings.reportErrors("SettingsViewModel", "Could not read settings").stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val status = MutableStateFlow(SystemStatus.read(app))
     val playing = AdhanService.playing
     val message = MutableStateFlow<String?>(null)
 
     fun refreshStatus() { status.value = SystemStatus.read(app) }
 
-    fun update(fn: (AppSettings) -> AppSettings) = viewModelScope.launch { repo.update(fn) }
+    fun update(fn: (AppSettings) -> AppSettings) = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("SettingsViewModel")) { repo.update(fn) }
 
     fun preview() {
         ContextCompat.startForegroundService(app, AdhanService.previewIntent(app))
@@ -49,7 +50,7 @@ class SettingsViewModel @Inject constructor(
         if (uri == null) it else it.copy(soundSource = SoundSource.RINGTONE, soundUri = uri.toString(), soundName = title)
     }
 
-    fun importCustom(uri: Uri) = viewModelScope.launch {
+    fun importCustom(uri: Uri) = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("SettingsViewModel")) {
         // Keep a persistable grant (useful for re-import), but play from a private copy for reliability.
         runCatching { app.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         val result = withContext(Dispatchers.IO) { Sounds.importCustom(app, uri) }
@@ -64,7 +65,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     /** Manual coordinates; the time zone comes from the nearest bundled city unless one is given. */
-    fun setManualLocation(lat: Double, lng: Double, tz: String?) = viewModelScope.launch {
+    fun setManualLocation(lat: Double, lng: Double, tz: String?) = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("SettingsViewModel")) {
         val near = runCatching {
             withContext(Dispatchers.Default) { com.kamalahmed.prayerapp.core.location.CityDatabase.get(app).nearest(lat, lng) }
         }.getOrNull()
@@ -81,11 +82,11 @@ class SettingsViewModel @Inject constructor(
     fun finishOnboarding() = update { it.copy(onboardingDone = true) }
 
     /** Auto location on app open (respects the geofence). */
-    fun autoRefreshIfEnabled() = viewModelScope.launch {
+    fun autoRefreshIfEnabled() = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("SettingsViewModel")) {
         if (repo.current().autoLocation) location.refresh(force = false)
     }
 
-    fun refreshLocation() = viewModelScope.launch {
+    fun refreshLocation() = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("SettingsViewModel")) {
         message.value = when (val r = location.refresh(force = true)) {
             is LocationResult.Updated -> "Location set to ${r.city}"
             LocationResult.WithinGeofence -> "Location unchanged"

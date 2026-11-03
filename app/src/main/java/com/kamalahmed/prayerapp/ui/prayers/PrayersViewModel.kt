@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import java.time.Duration
 import java.time.Instant
 import java.time.ZonedDateTime
+import com.kamalahmed.prayerapp.core.safety.reportErrors
 import javax.inject.Inject
 
 data class PrayersUiState(
@@ -68,7 +69,7 @@ class PrayersViewModel @Inject constructor(
             others = Prayer.obligatory.filter { it != next.prayer }.map { PrayerEvent(it, today[it]) },
             day = Prayer.entries.map { PrayerEvent(it, today[it]) },
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }.reportErrors("PrayersViewModel", "Could not calculate prayer times").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 }
 
 fun AppSettings.zoneOrDefault(): java.time.ZoneId =

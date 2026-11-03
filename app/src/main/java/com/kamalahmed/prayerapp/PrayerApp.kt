@@ -16,6 +16,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import com.kamalahmed.prayerapp.core.safety.CrashLog
+import com.kamalahmed.prayerapp.core.safety.guard
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -28,7 +30,7 @@ class PrayerApp : Application(), Configuration.Provider {
     @Inject lateinit var updatePrefs: com.kamalahmed.prayerapp.update.UpdatePrefs
     @Inject lateinit var tracker: com.kamalahmed.prayerapp.tracker.TrackerRepository
 
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val appScope = com.kamalahmed.prayerapp.core.safety.safeScope("PrayerApp")
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
@@ -36,21 +38,26 @@ class PrayerApp : Application(), Configuration.Provider {
     @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
-        Channels.create(this)
-        com.kamalahmed.prayerapp.update.UpdateWorker.createChannel(this)
-        com.kamalahmed.prayerapp.update.UpdateWorker.schedule(this, updatePrefs.autoCheck.value, updatePrefs.wifiOnly.value)
-        RescheduleWorker.enqueue(this)
+        // First: record any later crash to local storage (Settings > App > Diagnostics). No network, no PII.
+        CrashLog.install(this, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
+        guard(TAG, "channels") { Channels.create(this) }
+        guard(TAG, "update channel") { com.kamalahmed.prayerapp.update.UpdateWorker.createChannel(this) }
+        guard(TAG, "update worker") { com.kamalahmed.prayerapp.update.UpdateWorker.schedule(this, updatePrefs.autoCheck.value, updatePrefs.wifiOnly.value) }
+        guard(TAG, "reschedule worker") { RescheduleWorker.enqueue(this) }
         // Any settings change (method, location, modes, reminders…) re-arms alarms and refreshes widgets.
         appScope.launch {
             settings.settings.distinctUntilChanged().debounce(400).collect {
-                scheduler.rescheduleAll()
-                hooks.onSystemChange()
+                // Each step guarded so one failure doesn't end the collector (no more re-arming for the session).
+                guard(TAG, "rescheduleAll") { scheduler.rescheduleAll() }
+                guard(TAG, "onSystemChange") { hooks.onSystemChange() }
             }
         }
         // Marking prayers in the app updates the streak widgets.
         appScope.launch {
-            tracker.changes.debounce(300).collect { com.kamalahmed.prayerapp.widget.WidgetUpdater.updateAll(this@PrayerApp) }
+            tracker.changes.debounce(300).collect { guard(TAG, "widgets") { com.kamalahmed.prayerapp.widget.WidgetUpdater.updateAll(this@PrayerApp) } }
         }
-        com.kamalahmed.prayerapp.widget.WidgetUpdater.ensureScheduled(this)
+        guard(TAG, "widget schedule") { com.kamalahmed.prayerapp.widget.WidgetUpdater.ensureScheduled(this) }
     }
+
+    private companion object { const val TAG = "PrayerApp" }
 }

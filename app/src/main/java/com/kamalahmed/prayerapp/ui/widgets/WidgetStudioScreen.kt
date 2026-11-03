@@ -56,7 +56,10 @@ fun WidgetStudioScreen(onBack: () -> Unit) {
     val ctx = LocalContext.current
     var data by remember { mutableStateOf<WidgetData?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
-    LaunchedEffect(refresh) { data = widgetDeps(ctx).loadWidgetData() }
+    LaunchedEffect(refresh) {
+        data = com.kamalahmed.prayerapp.core.safety.guard("WidgetStudio", "loadWidgetData") { widgetDeps(ctx).loadWidgetData() }
+            ?: data.also { com.kamalahmed.prayerapp.core.safety.AppErrors.report("Couldn't load widget previews. Try again later.") }
+    }
     LifecycleResumeEffect(Unit) { refresh++; onPauseOrDispose { } }
     val pinSupported = remember { AppWidgetManager.getInstance(ctx).isRequestPinAppWidgetSupported }
 

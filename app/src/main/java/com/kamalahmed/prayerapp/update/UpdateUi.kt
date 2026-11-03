@@ -58,7 +58,7 @@ object UpdateNav { val openRequested = MutableStateFlow(false) }
 class UpdateViewModel @Inject constructor(val manager: UpdateManager) : ViewModel() {
     val state = manager.state
     val prefs = manager.prefs
-    fun check() = viewModelScope.launch { manager.check() }
+    fun check() = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("UpdateUi")) { manager.check() }
     fun setAutoCheck(ctx: android.content.Context, v: Boolean) { prefs.setAutoCheck(v); UpdateWorker.schedule(ctx, v, prefs.wifiOnly.value, replace = true) }
     fun setWifiOnly(ctx: android.content.Context, v: Boolean) { prefs.setWifiOnly(v); UpdateWorker.schedule(ctx, prefs.autoCheck.value, v, replace = true) }
     fun setIncludeBeta(v: Boolean) { prefs.setIncludeBeta(v); check() }

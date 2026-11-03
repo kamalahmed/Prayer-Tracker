@@ -18,6 +18,7 @@ import com.kamalahmed.prayerapp.core.model.SoundSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -63,7 +64,15 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val onboarding = booleanPreferencesKey("onboarding_done")
     }
 
-    val settings: Flow<AppSettings> = context.settingsStore.data.map { it.toSettings() }
+    /** A read error (corrupt file, disk I/O) falls back to defaults instead of crashing every collector. */
+    val settings: Flow<AppSettings> = context.settingsStore.data
+        .catch { e ->
+            if (e is java.io.IOException) {
+                com.kamalahmed.prayerapp.core.safety.CrashLog.nonFatal("SettingsRepository", "Settings read failed, using defaults", e)
+                emit(androidx.datastore.preferences.core.emptyPreferences())
+            } else throw e
+        }
+        .map { it.toSettings() }
 
     suspend fun current(): AppSettings = settings.first()
 

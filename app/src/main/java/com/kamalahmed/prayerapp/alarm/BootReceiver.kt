@@ -4,10 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import com.kamalahmed.prayerapp.core.safety.guard
+import com.kamalahmed.prayerapp.core.safety.launchAsync
 import javax.inject.Inject
 
 /**
@@ -21,15 +19,10 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action !in ACTIONS) return
-        val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            try {
-                Channels.create(context)
-                scheduler.rescheduleAll()
-                hooks.onSystemChange()
-            } finally {
-                pending.finish()
-            }
+        launchAsync("BootReceiver") {
+            guard("BootReceiver", "channels") { Channels.create(context) }
+            guard("BootReceiver", "rescheduleAll") { scheduler.rescheduleAll() }
+            guard("BootReceiver", "onSystemChange") { hooks.onSystemChange() }
         }
     }
 

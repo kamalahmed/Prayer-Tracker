@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZonedDateTime
+import com.kamalahmed.prayerapp.core.safety.reportErrors
 import javax.inject.Inject
 
 data class StreaksUi(
@@ -36,7 +37,7 @@ class StreaksViewModel @Inject constructor(
         val today = now.toLocalDate()
         val passed = sched.passedToday(now)
         StreaksUi(today, data[today].orEmpty(), passed, StreakCalculator.compute(data, today, passed))
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }.reportErrors("StreaksViewModel", "Could not load your prayer tracker").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val period = kotlinx.coroutines.flow.MutableStateFlow(com.kamalahmed.prayerapp.tracker.StatsPeriod.WEEK)
     val anchor = kotlinx.coroutines.flow.MutableStateFlow<LocalDate?>(null)
@@ -46,11 +47,11 @@ class StreaksViewModel @Inject constructor(
             val now = ZonedDateTime.now(sched.zone)
             val today = now.toLocalDate()
             com.kamalahmed.prayerapp.tracker.Stats.report(data, per, anc ?: today, today, sched.passedToday(now))
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        }.reportErrors("StreaksViewModel", "Could not load your prayer tracker").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val streakHistory: StateFlow<List<com.kamalahmed.prayerapp.tracker.StreakRun>> =
         combine(tracker.all, prayers.schedule) { data, _ -> com.kamalahmed.prayerapp.tracker.Stats.streakHistory(data) }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+            .reportErrors("StreaksViewModel", "Could not load your prayer tracker").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setPeriod(p: com.kamalahmed.prayerapp.tracker.StatsPeriod) { period.value = p; anchor.value = null }
     fun shift(by: Long) {
@@ -58,11 +59,11 @@ class StreaksViewModel @Inject constructor(
         val next = com.kamalahmed.prayerapp.tracker.Stats.shift(period.value, anchor.value ?: today, by)
         anchor.value = if (next.isAfter(today)) null else next
     }
-    fun set(date: LocalDate, p: Prayer, status: PrayerStatus?) = viewModelScope.launch { tracker.set(date, p, status) }
+    fun set(date: LocalDate, p: Prayer, status: PrayerStatus?) = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("StreaksViewModel")) { tracker.set(date, p, status) }
 
     val history: StateFlow<com.kamalahmed.prayerapp.tracker.TrackerData> =
-        tracker.all.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+        tracker.all.reportErrors("StreaksViewModel", "Could not load your prayer tracker").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    fun toggle(p: Prayer) = viewModelScope.launch { tracker.togglePrayed(state.value?.today ?: LocalDate.now(), p) }
-    fun cycle(date: LocalDate, p: Prayer) = viewModelScope.launch { tracker.cycle(date, p) }
+    fun toggle(p: Prayer) = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("StreaksViewModel")) { tracker.togglePrayed(state.value?.today ?: LocalDate.now(), p) }
+    fun cycle(date: LocalDate, p: Prayer) = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("StreaksViewModel")) { tracker.cycle(date, p) }
 }

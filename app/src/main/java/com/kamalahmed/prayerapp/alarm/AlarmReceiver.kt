@@ -10,10 +10,9 @@ import com.kamalahmed.prayerapp.core.model.Prayer
 import com.kamalahmed.prayerapp.core.model.TimeFormat
 import com.kamalahmed.prayerapp.data.settings.SettingsRepository
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import com.kamalahmed.prayerapp.core.safety.CrashLog
+import com.kamalahmed.prayerapp.core.safety.guard
+import com.kamalahmed.prayerapp.core.safety.launchAsync
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
@@ -32,8 +31,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val prayer = Prayer.entries.firstOrNull { it.name == intent.getStringExtra(AlarmScheduler.EXTRA_PRAYER) } ?: return
         val prayerTime = intent.getLongExtra(AlarmScheduler.EXTRA_PRAYER_TIME, System.currentTimeMillis())
         val at = intent.getLongExtra(AlarmScheduler.EXTRA_AT, System.currentTimeMillis())
-        val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+        launchAsync("AlarmReceiver") {
             try {
                 val s = settings.current()
                 Channels.create(context)
@@ -56,10 +54,11 @@ class AlarmReceiver : BroadcastReceiver() {
                             .setTimeoutAfter(10 * 60_000L),
                     )
                 }
-                if (type != AlarmType.SNOOZE) scheduler.rescheduleAll()
-                hooks.onAlarm(type, prayer)
             } finally {
-                pending.finish()
+                // Always re-arm the next alarms, even if showing this one failed; otherwise one bad alarm
+                // (e.g. a foreground-service start refused by the OS) would silence every later prayer.
+                if (type != AlarmType.SNOOZE) guard("AlarmReceiver", "rescheduleAll") { scheduler.rescheduleAll() }
+                guard("AlarmReceiver", "hooks.onAlarm") { hooks.onAlarm(type, prayer) }
             }
         }
     }
@@ -73,7 +72,14 @@ class AlarmReceiver : BroadcastReceiver() {
             NotifyMode.OFF -> return
             NotifyMode.SILENT -> ctx.notifySafely(id, prayerNotification(ctx, Channels.SILENT, prayer, prayerTime, timeText))
             NotifyMode.BEEP -> ctx.notifySafely(id, prayerNotification(ctx, Channels.BEEP, prayer, prayerTime, timeText))
-            NotifyMode.ADHAN -> ContextCompat.startForegroundService(ctx, AdhanService.playIntent(ctx, prayer, prayerTime))
+            NotifyMode.ADHAN -> try {
+                ContextCompat.startForegroundService(ctx, AdhanService.playIntent(ctx, prayer, prayerTime))
+            } catch (e: Exception) {
+                // Android 12+ can refuse a foreground-service start (ForegroundServiceStartNotAllowedException);
+                // still alert the user with a sounding notification instead of failing silently.
+                CrashLog.nonFatal("AlarmReceiver", "Adhan service start refused, falling back to notification", e)
+                ctx.notifySafely(id, prayerNotification(ctx, Channels.BEEP, prayer, prayerTime, timeText))
+            }
         }
         if (iqamaOn && prayer.isPrayer && iqamaMin > 0 && !snoozed) {
             val end = prayerTime + iqamaMin * 60_000L

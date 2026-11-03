@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import com.kamalahmed.prayerapp.core.safety.guard
 import java.util.concurrent.TimeUnit
 
 /** Safety net: periodically re-arms alarms in case an OEM killed them. Cheap and battery friendly. */
@@ -23,13 +24,14 @@ class RescheduleWorker @AssistedInject constructor(
 ) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         // Automatic location: only accepted when moved beyond the geofence (settings change re-arms alarms).
-        if (settings.current().autoLocation) runCatching { location.refresh(force = false) }
-        scheduler.rescheduleAll()
-        hooks.onSystemChange()
+        guard(TAG, "location") { if (settings.current().autoLocation) location.refresh(force = false) }
+        guard(TAG, "rescheduleAll") { scheduler.rescheduleAll() } ?: return Result.retry()
+        guard(TAG, "onSystemChange") { hooks.onSystemChange() }
         return Result.success()
     }
 
     companion object {
+        private const val TAG = "RescheduleWorker"
         fun enqueue(ctx: Context) {
             WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
                 "reschedule", ExistingPeriodicWorkPolicy.KEEP,

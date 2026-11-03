@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
+import com.kamalahmed.prayerapp.core.safety.reportErrors
 import javax.inject.Inject
 
 data class TimesUiState(
@@ -46,7 +47,7 @@ class TimesViewModel @Inject constructor(
         val date = sel ?: LocalDate.now(s.zoneOrDefault())
         val h = HijriCalendar.of(date, s.hijriAdjust)
         TimesUiState(s, date, sched.day(date), h.format(), sched, IslamicHolidays.upcoming(LocalDate.now(), s.hijriAdjust, 12))
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }.reportErrors("TimesViewModel", "Could not calculate the timetable").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     fun shiftDay(delta: Long) {
         val cur = state.value?.date ?: LocalDate.now()
@@ -56,7 +57,7 @@ class TimesViewModel @Inject constructor(
     fun today() { selected.value = null }
 
     /** Cycle OFF -> SILENT -> BEEP -> ADHAN -> OFF. */
-    fun cycleMode(p: Prayer) = viewModelScope.launch {
+    fun cycleMode(p: Prayer) = viewModelScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler("TimesViewModel")) {
         settingsRepo.update { s ->
             val next = NotifyMode.entries[(s.mode(p).ordinal + 1) % NotifyMode.entries.size]
             s.copy(notifyModes = s.notifyModes + (p to next))

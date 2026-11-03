@@ -7,10 +7,7 @@ import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
 import com.kamalahmed.prayerapp.core.model.Prayer
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import com.kamalahmed.prayerapp.core.safety.launchAsync
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
@@ -19,18 +16,19 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MarkPrayedReceiver : BroadcastReceiver() {
     @Inject lateinit var tracker: TrackerRepository
+    @Inject lateinit var settings: com.kamalahmed.prayerapp.data.settings.SettingsRepository
 
     override fun onReceive(context: Context, intent: Intent) {
         val prayer = Prayer.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_PRAYER) } ?: return
         val time = intent.getLongExtra(EXTRA_TIME, System.currentTimeMillis())
         val notifId = intent.getIntExtra(EXTRA_NOTIF, 0)
-        val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            try {
-                val date = Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate()
-                tracker.set(date, prayer, PrayerStatus.ON_TIME)
-                if (notifId != 0) NotificationManagerCompat.from(context).cancel(notifId)
-            } finally { pending.finish() }
+        launchAsync("MarkPrayed") {
+            // Use the prayer-time zone from settings (same as the schedule), not the device zone: they differ
+            // when travelling with a manually chosen city, which marked the wrong day near midnight.
+            val zone = runCatching { ZoneId.of(settings.current().timeZoneId) }.getOrDefault(ZoneId.systemDefault())
+            val date = Instant.ofEpochMilli(time).atZone(zone).toLocalDate()
+            tracker.set(date, prayer, PrayerStatus.ON_TIME)
+            if (notifId != 0) NotificationManagerCompat.from(context).cancel(notifId)
         }
     }
 

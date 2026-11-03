@@ -45,14 +45,24 @@ class WidgetConfigActivity : ComponentActivity() {
                 var style by remember { mutableStateOf<WidgetStyle?>(null) }
                 var data by remember { mutableStateOf<WidgetData?>(null) }
                 var isNew by remember { mutableStateOf(false) }
+                var failed by remember { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
-                    isNew = !styles.has(id)
-                    style = styles.get(id, kind)
-                    data = widgetDeps(this@WidgetConfigActivity).loadWidgetData()
+                    try {
+                        isNew = !styles.has(id)
+                        style = com.kamalahmed.prayerapp.core.safety.guard(TAG, "style") { styles.get(id, kind) } ?: WidgetStyle.decode(null, kind)
+                        data = widgetDeps(this@WidgetConfigActivity).loadWidgetData()
+                    } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
+                        com.kamalahmed.prayerapp.core.safety.CrashLog.nonFatal(TAG, "Widget setup failed", e)
+                        failed = true
+                    }
                 }
                 val s = style
                 val d = data
-                if (s == null || d == null) {
+                if (failed) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        androidx.compose.material3.Text("Couldn't load the widget settings. Close and try again.")
+                    }
+                } else if (s == null || d == null) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 } else {
                     WidgetConfigScreen(
@@ -67,15 +77,17 @@ class WidgetConfigActivity : ComponentActivity() {
     }
 
     private fun save(id: Int, kind: WidgetKind, style: WidgetStyle) {
-        lifecycleScope.launch {
+        lifecycleScope.launch(com.kamalahmed.prayerapp.core.safety.safeHandler(TAG)) {
             styles.save(id, style)
-            runCatching {
+            com.kamalahmed.prayerapp.core.safety.guard(TAG, "update #$id") {
                 val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity).getGlanceIdBy(id)
                 WidgetKinds.widget(kind).update(this@WidgetConfigActivity, glanceId)
             }
-            WidgetUpdater.ensureScheduled(applicationContext)
+            com.kamalahmed.prayerapp.core.safety.guard(TAG, "schedule") { WidgetUpdater.ensureScheduled(applicationContext) }
             setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id))
             finish()
         }
     }
+
+    private companion object { const val TAG = "WidgetConfig" }
 }

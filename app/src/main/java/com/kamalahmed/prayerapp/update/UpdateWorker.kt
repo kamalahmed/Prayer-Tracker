@@ -36,7 +36,7 @@ class UpdateWorker @AssistedInject constructor(
         val s = manager.check()
         val rel = (s as? UpdateState.Available)?.release ?: (s as? UpdateState.Downloaded)?.release
         if (rel != null && manager.prefs.notifiedTag != rel.tag) {
-            notify(applicationContext, rel)
+            com.kamalahmed.prayerapp.core.safety.guard("UpdateWorker", "notify") { notify(applicationContext, rel) }
             manager.prefs.notifiedTag = rel.tag
         }
         return Result.success() // errors (offline, rate limit) just wait for the next period

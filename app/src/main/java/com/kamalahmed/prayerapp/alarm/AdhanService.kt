@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
+import com.kamalahmed.prayerapp.core.safety.CrashLog
 import javax.inject.Inject
 
 data class PlayingInfo(val prayer: Prayer?, val prayerTime: Long, val preview: Boolean)
@@ -52,7 +53,7 @@ class AdhanService : Service() {
     @Inject lateinit var settingsRepo: SettingsRepository
     @Inject lateinit var scheduler: AlarmScheduler
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + com.kamalahmed.prayerapp.core.safety.safeHandler(TAG))
     private val handler = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
     private var focusRequest: AudioFocusRequest? = null
@@ -74,13 +75,27 @@ class AdhanService : Service() {
         triedFallback = false
         val info = PlayingInfo(prayer, time, preview)
         // Must call startForeground promptly.
-        Channels.create(this)
-        startInForeground(buildNotification(info, null))
+        try {
+            Channels.create(this)
+            startInForeground(buildNotification(info, null))
+        } catch (e: Exception) {
+            // e.g. ForegroundServiceStartNotAllowedException / missing FGS permission: give up cleanly.
+            CrashLog.nonFatal(TAG, "startForeground failed", e)
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         scope.launch {
-            val s = settingsRepo.current()
-            settings = s
-            startForeground(info, s)
-            play(info, s)
+            try {
+                val s = settingsRepo.current()
+                settings = s
+                startForeground(info, s)
+                play(info, s)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                CrashLog.nonFatal(TAG, "Could not start playback", e)
+                stopAll(postDua = false)
+            }
         }
         return START_NOT_STICKY
     }
@@ -138,10 +153,10 @@ class AdhanService : Service() {
         val uri = uriOverride ?: Sounds.resolve(this, s, info.prayer)
         val usage = if (s.useAlarmStream) AudioAttributes.USAGE_ALARM else AudioAttributes.USAGE_MEDIA
         val attrs = AudioAttributes.Builder().setUsage(usage).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
-        requestFocus(attrs)
         val mp = MediaPlayer()
         player = mp
         try {
+            requestFocus(attrs)
             mp.setAudioAttributes(attrs)
             mp.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
             mp.setDataSource(this, uri)
@@ -151,12 +166,12 @@ class AdhanService : Service() {
             mp.setOnPreparedListener { it.start() }
             mp.setOnCompletionListener { if (!s.loopSound) stopAll(postDua = !info.preview && s.adhanDua) }
             mp.setOnErrorListener { _, what, extra ->
-                Log.w(TAG, "Playback error $what/$extra for $uri")
+                CrashLog.nonFatal(TAG, "Playback error $what/$extra (${uri.scheme})")
                 fallbackOrStop(info, s); true
             }
             mp.prepareAsync()
         } catch (e: Exception) {
-            Log.w(TAG, "Cannot play $uri", e)
+            CrashLog.nonFatal(TAG, "Cannot play sound (${uri.scheme})", e)
             fallbackOrStop(info, s)
             return
         }
@@ -204,10 +219,10 @@ class AdhanService : Service() {
 
     private fun stopPlayer() {
         handler.removeCallbacksAndMessages(null)
-        player?.let { runCatching { it.stop() }; it.release() }
+        player?.let { runCatching { it.stop() }; runCatching { it.release() } }
         player = null
-        vibrator?.cancel()
-        focusRequest?.let { getSystemService(AudioManager::class.java).abandonAudioFocusRequest(it) }
+        runCatching { vibrator?.cancel() }
+        focusRequest?.let { f -> runCatching { getSystemService(AudioManager::class.java)?.abandonAudioFocusRequest(f) } }
         focusRequest = null
     }
 
@@ -223,7 +238,7 @@ class AdhanService : Service() {
         }
         _playing.value = null
         current = null
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        runCatching { ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE) }
         stopSelf()
     }
 

@@ -99,8 +99,14 @@ fun PrayerAppRoot() {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val spec = AdaptiveSpec(maxWidth.value, maxHeight.value)
         CompositionLocalProvider(LocalAdaptive provides spec) {
+            val snackbar = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+            val appError by com.kamalahmed.prayerapp.core.safety.AppErrors.latest.collectAsStateWithLifecycle()
+            LaunchedEffect(appError) {
+                appError?.let { snackbar.showSnackbar(it, withDismissAction = true); com.kamalahmed.prayerapp.core.safety.AppErrors.latest.value = null }
+            }
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
+                snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
                 bottomBar = {
                     if (!spec.useRail) NavigationBar(containerColor = Card) {
                         TopDest.entries.forEach { d ->

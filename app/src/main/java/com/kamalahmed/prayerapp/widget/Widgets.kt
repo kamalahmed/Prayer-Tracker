@@ -12,10 +12,7 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.provideContent
 import com.kamalahmed.prayerapp.core.model.Prayer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import com.kamalahmed.prayerapp.core.safety.launchAsync
 import java.time.LocalDate
 
 /** One GlanceAppWidget implementation drives all six kinds; only the layout differs. */
@@ -28,7 +25,9 @@ abstract class PrayerWidget(val kind: WidgetKind) : GlanceAppWidget() {
         // The layout kind comes from the instance's real provider (receiver), not from this object, so an
         // update routed through the wrong GlanceAppWidget can never render another widget's layout.
         val kind = WidgetKinds.kindOf(context, appWidgetId) ?: kind
-        val style = deps.styles().get(appWidgetId, kind)
+        // A corrupt style entry must not leave the widget blank: fall back to the kind's default look.
+        val style = com.kamalahmed.prayerapp.core.safety.guard("PrayerWidget", "style #$appWidgetId") { deps.styles().get(appWidgetId, kind) }
+            ?: WidgetStyle.decode(null, kind)
         val data = deps.loadWidgetData()
         provideContent { WidgetContent(kind, style, data) }
     }
@@ -49,10 +48,7 @@ abstract class PrayerWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
-        val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            try { widgetDeps(context).styles().delete(appWidgetIds) } finally { pending.finish() }
-        }
+        launchAsync("WidgetReceiver") { widgetDeps(context).styles().delete(appWidgetIds) }
     }
 
     override fun onDisabled(context: Context) {

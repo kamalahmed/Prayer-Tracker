@@ -18,9 +18,9 @@ import com.kamalahmed.prayerapp.alarm.AlarmHooks
 import com.kamalahmed.prayerapp.alarm.AlarmType
 import com.kamalahmed.prayerapp.core.model.Prayer
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import com.kamalahmed.prayerapp.core.safety.guard
+import com.kamalahmed.prayerapp.core.safety.launchAsync
+import com.kamalahmed.prayerapp.core.safety.safeScope
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -61,7 +61,7 @@ object WidgetUpdater {
         val wm = WorkManager.getInstance(context)
         if (WidgetKinds.anyPlaced(context)) {
             wm.enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, PeriodicWorkRequestBuilder<WidgetRefreshWorker>(1, TimeUnit.HOURS).build())
-            CoroutineScope(SupervisorJob() + Dispatchers.Default).launch { refresh(context) }
+            safeScope(TAG).launch { refresh(context) }
         } else {
             wm.cancelUniqueWork(WORK)
             cancelBoundary(context)
@@ -94,17 +94,14 @@ object WidgetUpdater {
 
 class WidgetTickReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            try { WidgetUpdater.refresh(context) } finally { pending.finish() }
-        }
+        launchAsync("WidgetTick") { WidgetUpdater.refresh(context) }
     }
 }
 
 class WidgetRefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        WidgetUpdater.refresh(applicationContext)
-        return Result.success()
+        guard("WidgetRefreshWorker", "refresh") { WidgetUpdater.refresh(applicationContext) }
+        return Result.success() // hourly safety net; a failure is logged and retried next period
     }
 }
 
