@@ -61,8 +61,8 @@ object PrayerTimesCalculator {
         )
     }
 
-    private fun rawTimes(date: LocalDate, p: CalcParams): Map<Prayer, ZonedDateTime> {
-        val lat = p.latitude
+    /** fajr, sunrise, dhuhr, asr, sunset, maghrib, isha in UTC hours; entries may be NaN at extreme latitudes. */
+    private fun hours(date: LocalDate, p: CalcParams, lat: Double): DoubleArray {
         val jd = julian(date.year, date.monthValue, date.dayOfMonth) - p.longitude / (15.0 * 24.0)
 
         // Two iterations: first with default day portions, then refined with computed times.
@@ -94,6 +94,27 @@ object PrayerTimesCalculator {
                 t[6] = adjustHighLat(t[6], sunset, p.method.ishaAngle, nightLen, ccw = false, rule = p.highLatRule)
             }
         }
+        return t
+    }
+
+    /** Latitude used to fill in times that do not exist (polar day/night); "nearest latitude" fallback. */
+    internal const val SAFE_LATITUDE = 48.5
+    // Offsets from Dhuhr (hours) used only if even the safe-latitude fallback cannot produce a time.
+    private val LAST_RESORT = doubleArrayOf(-6.5, -5.0, 0.0, 3.0, 5.0, 5.0, 6.5)
+
+    private fun rawTimes(date: LocalDate, p: CalcParams): Map<Prayer, ZonedDateTime> {
+        val t = hours(date, p, p.latitude)
+        val usedFallback = t.any { !it.isFinite() }
+        if (usedFallback && t.any { !it.isFinite() }) {
+            // Polar day / polar night / twilight that never ends: the astronomical time does not exist.
+            // Previously this produced NaN and crashed with "Cannot round NaN value" (London Fajr in June with
+            // high-latitude rule NONE, Tromso sunrise in summer, ...). Borrow the time from the nearest safe latitude.
+            val fb = hours(date, p, if (p.latitude >= 0) SAFE_LATITUDE else -SAFE_LATITUDE)
+            for (i in t.indices) if (!t[i].isFinite()) t[i] = fb[i]
+            for (i in t.indices) if (!t[i].isFinite()) t[i] = t[2] + LAST_RESORT[i]
+            // Keep the order Fajr <= Sunrise <= Dhuhr <= Asr <= Sunset <= Maghrib <= Isha after mixing sources.
+            for (i in 1 until t.size) if (t[i] < t[i - 1]) t[i] = t[i - 1]
+        }
 
         val midnightUtc = date.atStartOfDay(ZoneId.of("UTC"))
         fun toZoned(hours: Double, prayer: Prayer): ZonedDateTime {
@@ -101,7 +122,7 @@ object PrayerTimesCalculator {
             val seconds = (hours * 3600.0).roundToLong() + totalAdj * 60L
             return roundToMinute(midnightUtc.plusSeconds(seconds).withZoneSameInstant(p.zone))
         }
-        return linkedMapOf(
+        val out = linkedMapOf(
             Prayer.FAJR to toZoned(t[0], Prayer.FAJR),
             Prayer.SUNRISE to toZoned(t[1], Prayer.SUNRISE),
             Prayer.DHUHR to toZoned(t[2], Prayer.DHUHR),
@@ -109,6 +130,12 @@ object PrayerTimesCalculator {
             Prayer.MAGHRIB to toZoned(t[5], Prayer.MAGHRIB),
             Prayer.ISHA to toZoned(t[6], Prayer.ISHA),
         )
+        if (usedFallback) {
+            // Method offsets (e.g. Turkey's Maghrib +7 / Isha -2) can reorder compressed fallback times.
+            var prev: ZonedDateTime? = null
+            for (k in out.keys) { val v = out.getValue(k); if (prev != null && v.isBefore(prev)) out[k] = prev; prev = out.getValue(k) }
+        }
+        return out
     }
 
     private fun roundToMinute(z: ZonedDateTime): ZonedDateTime {
