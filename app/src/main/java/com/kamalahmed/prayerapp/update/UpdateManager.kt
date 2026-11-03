@@ -56,6 +56,8 @@ class UpdateManager @Inject constructor(
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
     private var downloadJob: Job? = null
+    /** Seam for tests (offline, malformed JSON); production fetches from the GitHub API. */
+    internal var releasesSource: () -> String = { fetchReleases() }
 
     val currentVersion: String get() = BuildConfig.VERSION_NAME
     val currentCode: Int get() = BuildConfig.VERSION_CODE
@@ -74,7 +76,7 @@ class UpdateManager @Inject constructor(
         if (busy is UpdateState.Downloading || busy is UpdateState.Installing) return@withContext busy
         _state.value = UpdateState.Checking
         val result = try {
-            val json = fetchReleases()
+            val json = releasesSource()
             val rel = ReleaseParser.pickUpdate(ReleaseParser.parseList(json), prefs.includeBeta.value, currentVersion, currentCode)
             prefs.lastCheck = System.currentTimeMillis()
             if (rel == null) UpdateState.UpToDate
@@ -88,6 +90,7 @@ class UpdateManager @Inject constructor(
         } catch (e: IOException) {
             UpdateState.Error("Couldn't reach GitHub (${e.message ?: e.javaClass.simpleName}).")
         } catch (e: Exception) {
+            com.kamalahmed.prayerapp.core.safety.CrashLog.nonFatal(TAG, "Release info unreadable", e)
             UpdateState.Error("Couldn't read release info.")
         }
         _state.value = result
@@ -172,8 +175,14 @@ class UpdateManager @Inject constructor(
         // Clear stale APKs from older releases.
         updatesDir().listFiles()?.filter { !it.name.startsWith(out.name) }?.forEach { it.delete() }
         val part = File(updatesDir(), out.name + ".part")
-        val expectedSha = rel.sha256Asset?.let { runCatching { fetchText(it.url) }.getOrNull()?.let(ReleaseParser::parseShaFile) }
-            ?: rel.notesSha256
+        if (!UpdateSecurity.isTrustedUrl(asset.url)) throw IOException("Refusing to download from an untrusted address.")
+        if (asset.size > UpdateSecurity.MAX_APK_BYTES) throw IOException("The update file is unexpectedly large. Not downloading.")
+        val shaFromAsset = rel.sha256Asset?.takeIf { UpdateSecurity.isTrustedUrl(it.url) }?.let { a ->
+            runCatching { fetchText(a.url) }
+                .onFailure { com.kamalahmed.prayerapp.core.safety.CrashLog.nonFatal(TAG, "SHA-256 asset fetch failed, using release notes", it) }
+                .getOrNull()?.let(ReleaseParser::parseShaFile)
+        }
+        val expectedSha = UpdateSecurity.requireSha(shaFromAsset ?: rel.notesSha256)
         if (part.exists() && asset.size > 0 && part.length() > asset.size) part.delete()
 
         var existing = part.length()
@@ -185,6 +194,8 @@ class UpdateManager @Inject constructor(
         }
         try {
             val code = conn.responseCode
+            // After redirects (github.com -> objects.githubusercontent.com) the final address must still be trusted HTTPS.
+            if (!UpdateSecurity.isTrustedUrl(conn.url.toString())) throw IOException("Download was redirected to an untrusted address.")
             val append = when (code) {
                 HttpURLConnection.HTTP_PARTIAL -> true
                 HttpURLConnection.HTTP_OK -> { existing = 0; false }
@@ -204,6 +215,7 @@ class UpdateManager @Inject constructor(
                         if (n < 0) break
                         os.write(buf, 0, n)
                         bytes += n
+                        if (bytes > UpdateSecurity.MAX_APK_BYTES) throw IOException("The update file is unexpectedly large. Download stopped.")
                         val now = System.currentTimeMillis()
                         if (now - lastEmit > 150) { lastEmit = now; _state.value = UpdateState.Downloading(rel, bytes, total) }
                     }
@@ -216,12 +228,14 @@ class UpdateManager @Inject constructor(
             part.delete()
             throw IOException("Size mismatch (got ${part.length()} of ${asset.size} bytes). Please retry.")
         }
-        if (expectedSha != null) {
-            val actual = sha256(part)
-            if (!actual.equals(expectedSha, true)) {
-                part.delete()
-                throw IOException("Checksum mismatch: the download is corrupt or was tampered with.")
-            }
+        val actual = sha256(part)
+        if (!actual.equals(expectedSha, true)) {
+            part.delete()
+            throw IOException("Checksum mismatch: the download is corrupt or was tampered with.")
+        }
+        try { UpdateSecurity.verifyDownloadedApk(ctx, part) } catch (e: Exception) {
+            part.delete()
+            throw IOException(e.message ?: "The downloaded APK failed verification.")
         }
         out.delete()
         if (!part.renameTo(out)) throw IOException("Couldn't save the update")
@@ -232,12 +246,14 @@ class UpdateManager @Inject constructor(
     private suspend fun currentCoroutineContextEnsureActive() = kotlin.coroutines.coroutineContext.ensureActive()
 
     private fun fetchText(url: String): String {
+        if (!UpdateSecurity.isTrustedUrl(url)) throw IOException("untrusted checksum URL")
         val c = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000; readTimeout = 15_000; instanceFollowRedirects = true
             setRequestProperty("User-Agent", "PrayerApp/${BuildConfig.VERSION_NAME} (Android)")
         }
         try {
             if (c.responseCode != 200) throw IOException("HTTP ${c.responseCode}")
+            if (!UpdateSecurity.isTrustedUrl(c.url.toString())) throw IOException("checksum redirected to an untrusted address")
             return c.inputStream.bufferedReader().use { it.readText().take(4096) }
         } finally { c.disconnect() }
     }
@@ -254,6 +270,8 @@ class UpdateManager @Inject constructor(
         scope.launch {
             try {
                 _state.value = UpdateState.Installing(rel)
+                // Re-check right before installing (the file may have been downloaded by an older app version).
+                UpdateSecurity.verifyDownloadedApk(ctx, file)
                 val installer = ctx.packageManager.packageInstaller
                 val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
                     setAppPackageName(ctx.packageName)
@@ -302,6 +320,7 @@ class UpdateManager @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "UpdateManager"
         fun sha256(f: File): String {
             val md = MessageDigest.getInstance("SHA-256")
             f.inputStream().use { i -> val b = ByteArray(64 * 1024); while (true) { val n = i.read(b); if (n < 0) break; md.update(b, 0, n) } }
