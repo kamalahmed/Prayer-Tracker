@@ -64,3 +64,22 @@ Next: push to https://github.com/kamalahmed/Prayer-Tracker, publish the `v0.1.0-
 - **Audit:** `cities.tsv.gz` is the only asset, and no other page loads assets or uses reflection. The other Settings pages were not opened in tests, because they need Hilt ViewModels.
 - **Results:** 86 unit tests passing, lintDebug 0 errors, signed assembleRelease with signer `022ddd…481d`.
 - **Not verified on a device:** the emulator was offline, so nothing was run on hardware or the emulator this phase.
+
+## Phase 13: Hardening (v0.1.0-beta.5, versionCode 6), tag `phase-13-hardening`
+- **Critical review:** `docs/REVIEW_beta5.md` lists 23 findings (1 critical, 9 high, 7 medium, 6 low). All critical, high and medium findings are fixed, plus 5 of the 6 low ones.
+- **Critical fix:** at high latitudes, NaN prayer times crashed the app. Times now fall back to a safe-latitude recompute (`PolarTest`).
+- **Safety net:** a local crash log (uncaught-exception handler), plus coroutine handlers in all receivers, services, workers and ViewModels. Errors show as a snackbar instead of a crash. Settings > App has a Diagnostics section.
+- **Updater:**
+  - The SHA-256 is mandatory.
+  - Only https GitHub URLs are accepted, including after redirects.
+  - Downloads are capped at 100 MB.
+  - The update must have the same package, a higher versionCode, and the same signer.
+- **Tests:**
+  - `AllScreensPhoneTest` and `AllScreensFoldTest` open every tab and all 9 Settings pages.
+  - `SafetyTest` and `UpdateSecurityTest` are failure-injection tests.
+  - `CityAssetTest` checks that the asset names match what the code opens.
+- **Results:**
+  - 104 unit tests passing, lintDebug 0 errors.
+  - Signed assembleRelease, signer `022ddd…481d`.
+  - R8 mapping checked: the manifest classes, workers and Room implementation keep their names.
+- **Not verified on a device:** no hardware or emulator run this phase.

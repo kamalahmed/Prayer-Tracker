@@ -13,6 +13,9 @@ Defaults: Sharjah, UAE, using the Authority of Dubai calculation method.
 - Six home-screen widgets: Next, Wide, Streak, Tracker, Large and Minimal. Each widget has its own style settings for theme, transparency (0 % = no background at all), vertical padding, horizontal padding, spacing between items, position in the cell (top/center/bottom), text/icon/box size and accent. The background panel wraps the content, so a tall cell no longer shows an empty tinted area. Row widgets can be 1 cell tall. "Always show full layout" keeps every prayer visible at small sizes. The countdown ticks live, and Widget Studio shows a live preview.
 - Onboarding walks through location, notifications, exact alarm, battery and full-screen permissions.
 
+## Diagnostics
+If the app crashes, a local crash log is saved on the device. It is never uploaded. Open **Settings > App > Diagnostics** to view it or copy it. See `docs/REVIEW_beta5.md` for the hardening review.
+
 ## Build
 Requirements: JDK 17 and the Android SDK (platform 36). Put the SDK path in `local.properties` (`sdk.dir=...`) or set `ANDROID_HOME`.
 
