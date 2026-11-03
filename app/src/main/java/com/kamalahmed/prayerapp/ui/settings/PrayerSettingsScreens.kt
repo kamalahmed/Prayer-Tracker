@@ -255,6 +255,7 @@ fun AppScreen(vm: SettingsViewModel, onBack: () -> Unit, onOnboarding: () -> Uni
                 ListRow("Privacy", subtitle = "No accounts, no analytics. Location stays on the device and is only used to calculate times.")
             }
             if (updateVm != null) com.kamalahmed.prayerapp.update.UpdateSection(updateVm)
+            DiagnosticsSection()
             SectionHeader("Manage")
             CardGroup {
                 ListRow("Show onboarding again", onClick = onOnboarding)
@@ -271,6 +272,39 @@ fun AppScreen(vm: SettingsViewModel, onBack: () -> Unit, onOnboarding: () -> Uni
             text = { Text("Calculation, location, notification and sound settings go back to defaults (Sharjah, Authority of Dubai).") },
             confirmButton = { TextButton(onClick = { vm.resetAll(); confirmReset = false }) { Text("Reset") } },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+/** Settings > App > Diagnostics: last crash and recent handled errors, stored only on this device. */
+@Composable
+fun DiagnosticsSection() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var version by remember { mutableStateOf(0) }
+    val last = remember(version) { com.kamalahmed.prayerapp.core.safety.CrashLog.lastCrash(ctx) }
+    var show by remember { mutableStateOf(false) }
+    SectionHeader("Diagnostics")
+    CardGroup {
+        ListRow(
+            "Last crash report",
+            subtitle = last?.lineSequence()?.firstOrNull()?.removePrefix("CRASH at ") ?: "No crashes recorded",
+            onClick = if (last != null) ({ show = true }) else null,
+        )
+        RowDivider()
+        ListRow("Copy diagnostics", subtitle = "Copies the crash and error log (no location or personal data) to share with the developer", onClick = {
+            clipboard.setText(androidx.compose.ui.text.AnnotatedString(com.kamalahmed.prayerapp.core.safety.CrashLog.diagnostics(ctx)))
+            Toast.makeText(ctx, "Diagnostics copied", Toast.LENGTH_SHORT).show()
+        })
+        RowDivider()
+        ListRow("Clear diagnostics", onClick = { com.kamalahmed.prayerapp.core.safety.CrashLog.clear(ctx); version++ })
+    }
+    if (show && last != null) {
+        AlertDialog(
+            onDismissRequest = { show = false },
+            title = { Text("Last crash") },
+            text = { Text(last.take(3_000), modifier = Modifier.verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodySmall) },
+            confirmButton = { TextButton(onClick = { show = false }) { Text("Close") } },
         )
     }
 }

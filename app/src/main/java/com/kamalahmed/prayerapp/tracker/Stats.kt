@@ -142,7 +142,7 @@ object Stats {
         if (totals.due == 0) return emptyList()
         val name = period.label.lowercase()
         val out = ArrayList<String>()
-        val worst = perPrayer.first()
+        val worst = perPrayer.firstOrNull() ?: return emptyList()
         if (worst.counts.missed > 0) out += "You miss ${worst.prayer.displayName} most often (${worst.counts.missed} times this $name)."
         else out += "No missed prayers this $name. MashaAllah!"
         val bestOnTime = perPrayer.filter { it.counts.prayed > 0 }.maxByOrNull { it.counts.onTimePct }

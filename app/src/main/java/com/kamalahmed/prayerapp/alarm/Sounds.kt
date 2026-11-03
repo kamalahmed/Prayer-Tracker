@@ -48,9 +48,10 @@ object Sounds {
         } ?: "Custom sound"
         val dir = File(ctx.filesDir, "sounds").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
-        val ext = name.substringAfterLast('.', "audio").take(5)
+        // The display name comes from another app: keep only a short alphanumeric extension (no path tricks).
+        val ext = name.substringAfterLast('.', "audio").filter { it.isLetterOrDigit() }.take(5).ifEmpty { "audio" }
         val out = File(dir, "custom.$ext")
-        ctx.contentResolver.openInputStream(uri)!!.use { input -> out.outputStream().use { input.copyTo(it) } }
+        (ctx.contentResolver.openInputStream(uri) ?: throw java.io.IOException("Cannot open $uri")).use { input -> out.outputStream().use { input.copyTo(it) } }
         out.absolutePath to name
-    }.getOrNull()
+    }.onFailure { com.kamalahmed.prayerapp.core.safety.CrashLog.nonFatal("Sounds", "Custom sound import failed", it) }.getOrNull()
 }

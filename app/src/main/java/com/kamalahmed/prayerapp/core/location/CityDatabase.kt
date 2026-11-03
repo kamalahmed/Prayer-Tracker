@@ -78,13 +78,14 @@ class CityDatabase private constructor(private val entries: Array<Entry>) {
             var tz: List<String> = emptyList()
             val countries = HashMap<String, String>()
             val out = ArrayList<Entry>(72_000)
+            var skipped = 0
             reader.useLines { lines ->
                 for (line in lines) {
                     val p = line.split('\t')
                     when {
                         p[0] == "#tz" -> tz = p.drop(1)
                         p[0] == "#cc" -> p.drop(1).forEach { kv -> val i = kv.indexOf('='); if (i > 0) countries[kv.substring(0, i)] = kv.substring(i + 1) }
-                        p.size >= 9 -> {
+                        p.size >= 9 -> try {
                             val cc = p[3]
                             val city = City(
                                 name = p[0], country = countries[cc] ?: cc, lat = p[5].toDouble(), lng = p[6].toDouble(),
@@ -94,10 +95,15 @@ class CityDatabase private constructor(private val entries: Array<Entry>) {
                             keys += fold(p[0]); keys += fold(p[1])
                             if (p[2].isNotEmpty()) p[2].split('|').forEach { keys += it }
                             out += Entry(city, keys.toTypedArray())
+                        } catch (e: RuntimeException) {
+                            // One malformed row (bad number, unknown tz index) must not make the whole list unavailable.
+                            skipped++
                         }
                     }
                 }
             }
+            if (skipped > 0) runCatching { android.util.Log.w("CityDatabase", "Skipped $skipped malformed rows") }
+            if (out.isEmpty()) throw java.io.IOException("City list is empty or unreadable")
             return CityDatabase(out.toTypedArray())
         }
 

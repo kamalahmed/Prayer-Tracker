@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="file" path="diagnostics/" />
+    <exclude domain="file" path="sounds/" />
+    <exclude domain="sharedpref" path="updater.xml" />
+</full-backup-content>

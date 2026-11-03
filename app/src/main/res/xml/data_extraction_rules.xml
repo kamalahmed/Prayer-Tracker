@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Back up settings and the prayer tracker; never crash logs, the copied custom sound or updater caches. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="diagnostics/" />
+        <exclude domain="file" path="sounds/" />
+        <exclude domain="sharedpref" path="updater.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="diagnostics/" />
+        <exclude domain="sharedpref" path="updater.xml" />
+    </device-transfer>
+</data-extraction-rules>
