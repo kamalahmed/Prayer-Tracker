@@ -38,9 +38,6 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val city = stringPreferencesKey("city")
         val tz = stringPreferencesKey("tz")
         val geofence = intPreferencesKey("geofence_km")
-        val masjidName = stringPreferencesKey("masjid_name")
-        val masjidLat = doublePreferencesKey("masjid_lat")
-        val masjidLng = doublePreferencesKey("masjid_lng")
         val use24h = booleanPreferencesKey("use_24h")
         val hijriAdj = intPreferencesKey("hijri_adjust")
         val hijriAuto = booleanPreferencesKey("hijri_auto_inc")
@@ -93,9 +90,6 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             cityName = this[K.city] ?: d.cityName,
             timeZoneId = this[K.tz] ?: d.timeZoneId,
             geofenceKm = this[K.geofence] ?: d.geofenceKm,
-            masjidName = this[K.masjidName] ?: d.masjidName,
-            masjidLat = this[K.masjidLat],
-            masjidLng = this[K.masjidLng],
             use24h = this[K.use24h] ?: d.use24h,
             hijriAdjust = this[K.hijriAdj] ?: d.hijriAdjust,
             autoIncrementHijri = this[K.hijriAuto] ?: d.autoIncrementHijri,
@@ -133,9 +127,6 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         this[K.city] = s.cityName
         this[K.tz] = s.timeZoneId
         this[K.geofence] = s.geofenceKm
-        this[K.masjidName] = s.masjidName
-        if (s.masjidLat != null) this[K.masjidLat] = s.masjidLat else remove(K.masjidLat)
-        if (s.masjidLng != null) this[K.masjidLng] = s.masjidLng else remove(K.masjidLng)
         this[K.use24h] = s.use24h
         this[K.hijriAdj] = s.hijriAdjust
         this[K.hijriAuto] = s.autoIncrementHijri

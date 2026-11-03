@@ -55,7 +55,6 @@ val availableSettings = SettingsDest.entries.toSet()
 object Routes {
     const val CALENDAR = "calendar"
     const val HOLIDAYS = "holidays"
-    const val MASJIDS = "masjids"
 }
 
 @Composable
@@ -106,9 +105,8 @@ fun PrayerAppRoot() {
             NavHost(nav, startDestination = TopDest.PRAYERS.route) {
                 composable(TopDest.PRAYERS.route) { PrayersScreen(trackerContent = { TodayTracker() }) }
                 composable(TopDest.STREAKS.route) { StreaksScreen() }
-                composable(Routes.MASJIDS) { com.kamalahmed.prayerapp.masjid.MasjidScreen(onBack = back) }
                 composable(TopDest.TIMES.route) {
-                    TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) }, onMasjids = { nav.navigate(Routes.MASJIDS) })
+                    TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) })
                 }
                 composable(TopDest.QIBLA.route) { QiblaScreen() }
                 composable(TopDest.SETTINGS.route) {

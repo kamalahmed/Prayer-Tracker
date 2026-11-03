@@ -20,7 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Celebration
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsNone
@@ -66,7 +65,6 @@ fun NotifyMode.icon() = when (this) {
 fun TimesScreen(
     onCalendar: () -> Unit,
     onHolidays: () -> Unit,
-    onMasjids: () -> Unit,
     vm: TimesViewModel = hiltViewModel(),
 ) {
     val st by vm.state.collectAsStateWithLifecycle()
@@ -124,8 +122,6 @@ fun TimesScreen(
             ListRow("Monthly Calendar", leading = Icons.Filled.CalendarMonth, onClick = onCalendar)
             RowDivider()
             ListRow("Islamic Holidays", leading = Icons.Filled.Celebration, onClick = onHolidays)
-            RowDivider()
-            ListRow("Nearby Masjids", subtitle = "Found automatically from OpenStreetMap", leading = Icons.Filled.LocationOn, onClick = onMasjids)
         }
         Spacer(Modifier.height(24.dp))
     }

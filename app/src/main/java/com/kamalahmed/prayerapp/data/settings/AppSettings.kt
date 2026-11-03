@@ -20,9 +20,6 @@ data class AppSettings(
     val cityName: String = "Sharjah",
     val timeZoneId: String = "Asia/Dubai",
     val geofenceKm: Int = 10,
-    val masjidName: String = "",
-    val masjidLat: Double? = null,
-    val masjidLng: Double? = null,
     // Time
     val use24h: Boolean = false,
     val hijriAdjust: Int = 0,

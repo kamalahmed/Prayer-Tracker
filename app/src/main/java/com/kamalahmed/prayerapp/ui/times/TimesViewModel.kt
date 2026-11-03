@@ -62,8 +62,4 @@ class TimesViewModel @Inject constructor(
             s.copy(notifyModes = s.notifyModes + (p to next))
         }
     }
-
-    fun setMasjid(name: String, lat: Double?, lng: Double?) = viewModelScope.launch {
-        settingsRepo.update { it.copy(masjidName = name, masjidLat = lat, masjidLng = lng) }
-    }
 }
