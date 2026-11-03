@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -38,9 +39,16 @@ import kotlinx.coroutines.withContext
 fun CitySearch(selectedLabel: String?, onPick: (City) -> Unit, limit: Int = 30) {
     val context = LocalContext.current.applicationContext
     var query by rememberSaveable { mutableStateOf("") }
+    var failed by remember { mutableStateOf(false) }
     val results by produceState<List<City>?>(null, query) {
         if (query.isNotBlank()) delay(150) // debounce typing
-        value = withContext(Dispatchers.Default) { CityDatabase.get(context).search(query, limit) }
+        // Never let a missing/corrupt city file take the whole app down (beta.3 crash).
+        value = try {
+            withContext(Dispatchers.Default) { CityDatabase.get(context).search(query, limit) }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e
+        } catch (e: Throwable) {
+            android.util.Log.e("CitySearch", "City database unavailable", e); failed = true; emptyList()
+        }
     }
     OutlinedTextField(
         value = query, onValueChange = { query = it }, singleLine = true,
@@ -52,6 +60,9 @@ fun CitySearch(selectedLabel: String?, onPick: (City) -> Unit, limit: Int = 30) 
     val list = results
     when {
         list == null -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp))
+        failed -> Text("City list unavailable. Use Automatic location or enter coordinates below.",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(16.dp))
         list.isEmpty() -> Text("No city found. Try another spelling or enter coordinates below.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(16.dp))

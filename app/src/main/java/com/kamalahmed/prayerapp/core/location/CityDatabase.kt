@@ -67,8 +67,14 @@ class CityDatabase private constructor(private val entries: Array<Entry>) {
             MARKS.replace(Normalizer.normalize(s.trim(), Normalizer.Form.NFKD), "").lowercase()
                 .replace('\u2019', '\'').replace(Regex("\\s+"), " ")
 
+        /** Reads the TSV, gzip-compressed or plain (sniffs the gzip magic bytes). */
         fun load(input: InputStream): CityDatabase {
-            val reader = BufferedReader(InputStreamReader(GZIPInputStream(input), Charsets.UTF_8), 1 shl 16)
+            val buffered = java.io.BufferedInputStream(input, 1 shl 16)
+            buffered.mark(2)
+            val gz = buffered.read() == 0x1f && buffered.read() == 0x8b
+            buffered.reset()
+            val raw: InputStream = if (gz) GZIPInputStream(buffered, 1 shl 16) else buffered
+            val reader = BufferedReader(InputStreamReader(raw, Charsets.UTF_8), 1 shl 16)
             var tz: List<String> = emptyList()
             val countries = HashMap<String, String>()
             val out = ArrayList<Entry>(72_000)
@@ -100,7 +106,22 @@ class CityDatabase private constructor(private val entries: Array<Entry>) {
         /** Loads once from app assets (about 0.5 s on a mid-range phone; call off the main thread). */
         fun get(context: android.content.Context): CityDatabase =
             instance ?: synchronized(this) {
-                instance ?: context.assets.open("cities.tsv.gz").use { load(it) }.also { instance = it }
+                instance ?: openAsset(context.assets).use { load(it) }.also { instance = it }
             }
+
+        /**
+         * The source file is `assets/cities.tsv.gz`, but the Android asset packager gunzips `*.gz` assets and
+         * stores them as `assets/cities.tsv` (that is what is inside the beta.3 APK). Opening the `.gz` name
+         * threw FileNotFoundException on every device - the Settings > Location crash. Try both names.
+         */
+        internal val ASSET_NAMES = listOf("cities.tsv", "cities.tsv.gz")
+
+        internal fun openAsset(assets: android.content.res.AssetManager): InputStream {
+            var last: java.io.IOException? = null
+            for (n in ASSET_NAMES) {
+                try { return assets.open(n) } catch (e: java.io.IOException) { last = e }
+            }
+            throw last ?: java.io.FileNotFoundException("cities.tsv")
+        }
     }
 }

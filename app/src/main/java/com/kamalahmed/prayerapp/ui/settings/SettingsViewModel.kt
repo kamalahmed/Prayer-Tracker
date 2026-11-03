@@ -65,7 +65,9 @@ class SettingsViewModel @Inject constructor(
 
     /** Manual coordinates; the time zone comes from the nearest bundled city unless one is given. */
     fun setManualLocation(lat: Double, lng: Double, tz: String?) = viewModelScope.launch {
-        val near = withContext(Dispatchers.Default) { com.kamalahmed.prayerapp.core.location.CityDatabase.get(app).nearest(lat, lng) }
+        val near = runCatching {
+            withContext(Dispatchers.Default) { com.kamalahmed.prayerapp.core.location.CityDatabase.get(app).nearest(lat, lng) }
+        }.getOrNull()
         repo.update {
             it.copy(autoLocation = false, latitude = lat, longitude = lng,
                 cityName = near?.let { c -> "Near ${c.label}" } ?: String.format(java.util.Locale.US, "%.4f, %.4f", lat, lng),
