@@ -8,7 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.content.getSystemService
-import androidx.glance.appwidget.updateAll
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -38,8 +38,16 @@ object WidgetUpdater {
 
     suspend fun updateAll(context: Context) {
         if (!WidgetKinds.anyPlaced(context)) return
+        // Update each placed instance through its own receiver's widget, by appWidgetId. GlanceAppWidget.updateAll()
+        // looks instances up by the GlanceAppWidget class name, which broke when R8 merged the six widget classes
+        // (every widget was re-rendered with another kind's layout, e.g. "All prayers" collapsing to "Next prayer").
+        val glance = GlanceAppWidgetManager(context)
         WidgetKind.entries.forEach { kind ->
-            runCatching { WidgetKinds.widget(kind).updateAll(context) }.onFailure { Log.w(TAG, "update $kind", it) }
+            val widget = WidgetKinds.widget(kind)
+            WidgetKinds.ids(context, kind).forEach { appWidgetId ->
+                runCatching { widget.update(context, glance.getGlanceIdBy(appWidgetId)) }
+                    .onFailure { Log.w(TAG, "update $kind #$appWidgetId", it) }
+            }
         }
     }
 

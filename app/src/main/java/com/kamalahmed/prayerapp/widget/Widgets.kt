@@ -25,6 +25,9 @@ abstract class PrayerWidget(val kind: WidgetKind) : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val deps = widgetDeps(context)
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+        // The layout kind comes from the instance's real provider (receiver), not from this object, so an
+        // update routed through the wrong GlanceAppWidget can never render another widget's layout.
+        val kind = WidgetKinds.kindOf(context, appWidgetId) ?: kind
         val style = deps.styles().get(appWidgetId, kind)
         val data = deps.loadWidgetData()
         provideContent { WidgetContent(kind, style, data) }

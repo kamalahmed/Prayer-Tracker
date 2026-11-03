@@ -74,6 +74,12 @@ class WidgetUiState(val style: WidgetStyle, val data: WidgetData, val interactiv
     fun label(p: Prayer) = p.label(abbr)
     fun rowLabel(r: WidgetRow) = if (abbr) r.abbr else r.name
 
+    @Composable
+    fun compact(kind: WidgetKind): Boolean {
+        val size = LocalSize.current
+        return WidgetLayout.compact(kind, size.width.value, size.height.value, style)
+    }
+
     /** Rows for list layouts honouring the Sunrise / Midnight toggles. */
     fun listRows(): List<WidgetRow> = buildList {
         addAll(data.rows.filter { it.prayer != Prayer.SUNRISE || style.showSunrise })
@@ -249,7 +255,7 @@ private fun NextSmall(ui: WidgetUiState) {
 @Composable
 private fun AllWide(ui: WidgetUiState) {
     val d = ui.data
-    val compact = LocalSize.current.height < 100.dp
+    val compact = ui.compact(WidgetKind.ALL_WIDE)
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(d.next.prayer.displayName, style = ui.ts(16f, bold = true), maxLines = 1)
@@ -261,7 +267,7 @@ private fun AllWide(ui: WidgetUiState) {
         }
         Spacer(GlanceModifier.height(ui.gap))
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            ui.listRows().take(8).forEach { r -> WideCell(ui, r, showIcon = ui.style.showIcons && !compact) }
+            ui.listRows().take(WidgetLayout.cellCount(WidgetKind.ALL_WIDE, ui.listRows().size)).forEach { r -> WideCell(ui, r, showIcon = ui.style.showIcons && !compact) }
         }
     }
 }
@@ -284,7 +290,7 @@ private fun RowScope.WideCell(ui: WidgetUiState, r: WidgetRow, showIcon: Boolean
 @Composable
 private fun NextStreak(ui: WidgetUiState) {
     val d = ui.data
-    val compact = LocalSize.current.height < 130.dp
+    val compact = ui.compact(WidgetKind.NEXT_STREAK)
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(modifier = GlanceModifier.defaultWeight()) {
@@ -319,7 +325,7 @@ private fun NextStreak(ui: WidgetUiState) {
 @Composable
 private fun Tracker(ui: WidgetUiState) {
     val d = ui.data
-    val compact = LocalSize.current.height < 100.dp
+    val compact = ui.compact(WidgetKind.TRACKER)
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Today", style = ui.ts(14f, bold = true), maxLines = 1)
@@ -385,7 +391,7 @@ private fun Large(ui: WidgetUiState) {
             }
         }
         Column(modifier = GlanceModifier.fillMaxWidth()) {
-            ui.listRows().take(8).forEach { r -> LargeRow(ui, r) }
+            ui.listRows().take(WidgetLayout.cellCount(WidgetKind.ALL_WIDE, ui.listRows().size)).forEach { r -> LargeRow(ui, r) }
         }
     }
 }

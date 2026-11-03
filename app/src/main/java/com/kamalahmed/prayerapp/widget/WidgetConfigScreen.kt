@@ -205,6 +205,11 @@ fun WidgetConfigScreen(
                         RowDivider()
                         SwitchRow("Islamic midnight", style.showMidnight) { v -> set { copy(showMidnight = v) } }
                     }
+                    if (kind == WidgetKind.ALL_WIDE || kind == WidgetKind.NEXT_STREAK || kind == WidgetKind.TRACKER) {
+                        RowDivider()
+                        SwitchRow("Always show full layout", style.alwaysFull,
+                            subtitle = "All prayers with icons and times, even when the launcher reports a small size") { v -> set { copy(alwaysFull = v) } }
+                    }
                 }
 
                 SectionHeader("Format")

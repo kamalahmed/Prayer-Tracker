@@ -60,6 +60,8 @@ data class WidgetStyle(
     val showMidnight: Boolean = false,
     val clock24: Tri = Tri.APP,
     val abbreviations: Tri = Tri.APP,
+    /** "Always show all prayers": never switch to the compact layout, whatever size the launcher reports. */
+    val alwaysFull: Boolean = false,
 ) {
     fun use24h(app: Boolean) = when (clock24) { Tri.APP -> app; Tri.ON -> true; Tri.OFF -> false }
     fun abbr(app: Boolean) = when (abbreviations) { Tri.APP -> app; Tri.ON -> true; Tri.OFF -> false }
@@ -70,6 +72,7 @@ data class WidgetStyle(
         "text" to fmt(textScale), "icon" to fmt(iconScale), "box" to fmt(boxScale), "weight" to weight.name,
         "hijri" to b(showHijri), "countdown" to b(showCountdown), "icons" to b(showIcons), "ampm" to b(showAmPm),
         "sunrise" to b(showSunrise), "midnight" to b(showMidnight), "clock" to clock24.name, "abbr" to abbreviations.name,
+        "full" to b(alwaysFull),
     ).joinToString(";") { "${it.first}=${it.second}" }
 
     /** Values clamped into their valid ranges. */
@@ -122,6 +125,7 @@ data class WidgetStyle(
                 showMidnight = bool("midnight", d.showMidnight),
                 clock24 = Tri.entries.firstOrNull { it.name == m["clock"] } ?: d.clock24,
                 abbreviations = Tri.entries.firstOrNull { it.name == m["abbr"] } ?: d.abbreviations,
+                alwaysFull = bool("full", d.alwaysFull),
             ).sanitized()
         }
     }
@@ -188,5 +192,37 @@ data class WidgetDims(val padTop: Int, val padBottom: Int, val padStart: Int, va
             val s = style.sanitized()
             return WidgetDims(s.padV, s.padV, s.padH, s.padH, s.spacing, s.spacing / 2, s.opacity > 0)
         }
+    }
+}
+
+/**
+ * Layout decisions from the real per-instance widget size (dp). Pure so it can be unit tested.
+ * Only the *detail* level changes with size (icons / times under the dots); the set of prayers shown never
+ * shrinks, so a widget can't "collapse" to one prayer because a launcher reported a small size.
+ */
+object WidgetLayout {
+    /** Heights below these (dp) drop secondary details. */
+    const val WIDE_COMPACT_H = 100
+    const val STREAK_COMPACT_H = 130
+    const val TRACKER_COMPACT_H = 100
+
+    fun compact(kind: WidgetKind, widthDp: Float, heightDp: Float, style: WidgetStyle): Boolean {
+        if (style.alwaysFull) return false
+        // Size 0x0 means the launcher has not reported options yet: use the full layout.
+        if (widthDp <= 0f || heightDp <= 0f) return false
+        return when (kind) {
+            WidgetKind.ALL_WIDE -> heightDp < WIDE_COMPACT_H
+            WidgetKind.NEXT_STREAK -> heightDp < STREAK_COMPACT_H
+            WidgetKind.TRACKER -> heightDp < TRACKER_COMPACT_H
+            else -> false
+        }
+    }
+
+    /** Number of prayer cells a list layout shows: always every enabled row (stable across sizes). */
+    fun cellCount(kind: WidgetKind, enabledRows: Int): Int = when (kind) {
+        WidgetKind.ALL_WIDE -> enabledRows.coerceAtMost(8)
+        WidgetKind.NEXT_STREAK, WidgetKind.TRACKER -> 5
+        WidgetKind.LARGE -> enabledRows
+        WidgetKind.NEXT_SMALL, WidgetKind.MINIMAL -> 0
     }
 }
