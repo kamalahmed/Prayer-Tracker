@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.kamalahmed.prayerapp.ui.theme.Card
 import com.kamalahmed.prayerapp.ui.theme.CardHigh
@@ -74,14 +76,24 @@ fun ListRow(
     leadingTint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
     onClick: (() -> Unit)? = null,
     showChevron: Boolean = onClick != null,
+    selected: Boolean = false,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
+    val accent = MaterialTheme.colorScheme.primary
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
+            .then(
+                if (selected) Modifier
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(accent.copy(alpha = 0.18f))
+                    .semantics { this.selected = true }
+                else Modifier
+            )
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = if (selected) 10.dp else 16.dp, vertical = if (selected) 7.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) {
@@ -89,7 +101,9 @@ fun ListRow(
             Spacer(Modifier.width(16.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(title, style = MaterialTheme.typography.bodyLarge,
+                color = if (selected) accent else androidx.compose.ui.graphics.Color.Unspecified,
+                fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else null)
             if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         trailing?.invoke(this)

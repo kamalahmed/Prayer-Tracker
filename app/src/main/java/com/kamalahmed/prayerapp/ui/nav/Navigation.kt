@@ -168,9 +168,9 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, back: () -> U
 }
 
 @Composable
-private fun SettingsList(open: (SettingsDest) -> Unit, openApp: () -> Unit) {
+private fun SettingsList(open: (SettingsDest) -> Unit, openApp: () -> Unit, selected: SettingsDest? = null) {
     val uvm: com.kamalahmed.prayerapp.update.UpdateViewModel = hiltViewModel()
-    SettingsScreen(hiltViewModel(), open = open, available = availableSettings,
+    SettingsScreen(hiltViewModel(), open = open, available = availableSettings, selected = selected,
         banner = { com.kamalahmed.prayerapp.update.UpdateBanner(uvm) { openApp() } })
 }
 
@@ -180,7 +180,7 @@ private fun SettingsListDetail() {
     var selected by rememberSaveable { mutableStateOf(SettingsDest.NOTIFICATIONS) }
     Row(Modifier.fillMaxSize()) {
         Box(Modifier.width(AdaptiveSpec.SETTINGS_LIST_WIDTH.dp).fillMaxHeight()) {
-            SettingsList(open = { selected = it }, openApp = { selected = SettingsDest.APP })
+            SettingsList(open = { selected = it }, openApp = { selected = SettingsDest.APP }, selected = selected)
         }
         VerticalDivider()
         Box(Modifier.weight(1f).fillMaxHeight()) {

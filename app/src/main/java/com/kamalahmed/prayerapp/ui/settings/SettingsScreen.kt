@@ -45,11 +45,20 @@ enum class SettingsDest(val route: String) {
 }
 
 @Composable
-fun SettingsScreen(vm: SettingsViewModel, open: (SettingsDest) -> Unit, available: Set<SettingsDest>, banner: @Composable () -> Unit = {}) {
+fun SettingsScreen(vm: SettingsViewModel, open: (SettingsDest) -> Unit, available: Set<SettingsDest>, selected: SettingsDest? = null, banner: @Composable () -> Unit = {}) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refreshStatus() }
     val s by vm.settings.collectAsStateWithLifecycle()
     val status by vm.status.collectAsStateWithLifecycle()
     val st = s ?: return
+    SettingsContent(st, status.hasProblem(st.fullScreenAlarm), open, available, selected, banner)
+}
+
+/** Stateless settings list (testable without a ViewModel). [selected] is highlighted in list-detail mode. */
+@Composable
+fun SettingsContent(
+    st: com.kamalahmed.prayerapp.data.settings.AppSettings, systemProblem: Boolean, open: (SettingsDest) -> Unit,
+    available: Set<SettingsDest>, selected: SettingsDest? = null, banner: @Composable () -> Unit = {},
+) {
     fun go(d: SettingsDest): (() -> Unit)? = if (d in available) ({ open(d) }) else null
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -57,35 +66,35 @@ fun SettingsScreen(vm: SettingsViewModel, open: (SettingsDest) -> Unit, availabl
         banner()
         SectionHeader("Notification")
         CardGroup {
-            ListRow("Prayer alerts & adhan", subtitle = "Per-prayer mode, full-screen, snooze, reminders", onClick = go(SettingsDest.NOTIFICATIONS))
+            ListRow("Prayer alerts & adhan", subtitle = "Per-prayer mode, full-screen, snooze, reminders", onClick = go(SettingsDest.NOTIFICATIONS), selected = selected == SettingsDest.NOTIFICATIONS)
             RowDivider()
-            ListRow("Adhan sound", subtitle = st.soundName, onClick = go(SettingsDest.SOUND))
+            ListRow("Adhan sound", subtitle = st.soundName, onClick = go(SettingsDest.SOUND), selected = selected == SettingsDest.SOUND)
         }
         SectionHeader("Prayer")
         CardGroup {
-            ListRow("Calculation", subtitle = CalculationMethod.fromId(st.calcMethod).label, onClick = go(SettingsDest.CALCULATION))
+            ListRow("Calculation", subtitle = CalculationMethod.fromId(st.calcMethod).label, onClick = go(SettingsDest.CALCULATION), selected = selected == SettingsDest.CALCULATION)
             RowDivider()
-            ListRow("Location", subtitle = st.cityName + if (st.autoLocation) " (auto)" else "", onClick = go(SettingsDest.LOCATION))
+            ListRow("Location", subtitle = st.cityName + if (st.autoLocation) " (auto)" else "", onClick = go(SettingsDest.LOCATION), selected = selected == SettingsDest.LOCATION)
             RowDivider()
-            ListRow("Time", subtitle = "24-hour, hijri, abbreviations, count-up", onClick = go(SettingsDest.TIME))
+            ListRow("Time", subtitle = "24-hour, hijri, abbreviations, count-up", onClick = go(SettingsDest.TIME), selected = selected == SettingsDest.TIME)
             RowDivider()
-            ListRow("Iqama", subtitle = if (st.iqamaEnabled) "On" else "Off", onClick = go(SettingsDest.IQAMA))
+            ListRow("Iqama", subtitle = if (st.iqamaEnabled) "On" else "Off", onClick = go(SettingsDest.IQAMA), selected = selected == SettingsDest.IQAMA)
         }
         SectionHeader("Device")
         CardGroup {
-            ListRow("System", onClick = go(SettingsDest.SYSTEM)) {
-                if (status.hasProblem(st.fullScreenAlarm)) {
+            ListRow("System", onClick = go(SettingsDest.SYSTEM), selected = selected == SettingsDest.SYSTEM) {
+                if (systemProblem) {
                     Box(Modifier.size(22.dp).background(Danger, CircleShape), contentAlignment = Alignment.Center) {
                         Text("!", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
             RowDivider()
-            ListRow("App", subtitle = "About, updates, onboarding, reset", onClick = go(SettingsDest.APP))
+            ListRow("App", subtitle = "About, updates, onboarding, reset", onClick = go(SettingsDest.APP), selected = selected == SettingsDest.APP)
         }
         SectionHeader("Widgets")
         CardGroup {
-            ListRow("Widget studio", subtitle = "Themes, transparency, sizes, spacing", onClick = go(SettingsDest.WIDGETS))
+            ListRow("Widget studio", subtitle = "Themes, transparency, sizes, spacing", onClick = go(SettingsDest.WIDGETS), selected = selected == SettingsDest.WIDGETS)
         }
         Spacer(Modifier.height(24.dp))
         Text(
