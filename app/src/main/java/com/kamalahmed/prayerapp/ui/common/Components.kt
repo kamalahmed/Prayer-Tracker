@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -133,12 +134,19 @@ fun SliderRow(title: String, value: Float, range: ClosedFloatingPointRange<Float
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubScreen(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth()) {
-        TopAppBar(
-            title = { Text(title) },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-        )
-        content()
+    val showBack = LocalShowBack.current
+    // Capped, centered content width so pages stay readable on tablets and the Fold inner screen.
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = 840.dp).fillMaxWidth()) {
+            TopAppBar(
+                title = { Text(title) },
+                navigationIcon = { if (showBack) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            )
+            content()
+        }
     }
 }
+
+/** False inside a list-detail pane, where the page is not a separate back-stack entry. */
+val LocalShowBack = androidx.compose.runtime.staticCompositionLocalOf { true }

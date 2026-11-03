@@ -7,6 +7,10 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.kamalahmed.prayerapp.ui.adaptive.LocalAdaptive
+import com.kamalahmed.prayerapp.ui.common.SectionHeader
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -72,7 +76,7 @@ fun TimesScreen(
     val ctx = LocalContext.current
     val use24 = s.settings.use24h
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    val dayPane: @Composable ColumnScope.() -> Unit = {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { vm.shiftDay(-1) }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous day") }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -118,12 +122,39 @@ fun TimesScreen(
             style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
         )
+    }
+    val morePane: @Composable ColumnScope.(Boolean) -> Unit = { wide ->
+        if (wide) {
+            SectionHeader("Upcoming Islamic holidays")
+            CardGroup {
+                val today = java.time.LocalDate.now()
+                s.holidays.take(6).forEachIndexed { i, h ->
+                    if (i > 0) RowDivider()
+                    val days = java.time.temporal.ChronoUnit.DAYS.between(today, h.date)
+                    ListRow(h.holiday.name, subtitle = h.date.format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.getDefault()))) {
+                        Text(if (days == 0L) "Today" else "in $days d", color = Gold)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
         CardGroup {
             ListRow("Monthly Calendar", leading = Icons.Filled.CalendarMonth, onClick = onCalendar)
             RowDivider()
             ListRow("Islamic Holidays", leading = Icons.Filled.Celebration, onClick = onHolidays)
         }
-        Spacer(Modifier.height(24.dp))
+    }
+    if (LocalAdaptive.current.twoPane) {
+        Row(Modifier.fillMaxSize()) {
+            Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) { dayPane(); Spacer(Modifier.height(24.dp)) }
+            Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(top = 8.dp)) { morePane(true); Spacer(Modifier.height(24.dp)) }
+        }
+    } else {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            dayPane()
+            morePane(false)
+            Spacer(Modifier.height(24.dp))
+        }
     }
 
 }

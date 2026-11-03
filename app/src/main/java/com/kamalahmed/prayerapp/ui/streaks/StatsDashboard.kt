@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.kamalahmed.prayerapp.ui.adaptive.LocalAdaptive
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -105,42 +106,48 @@ fun StreaksScreen(vm: StreaksViewModel = hiltViewModel()) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next ${r.period.label}")
             }
         }
+        val blocks = mutableListOf<@Composable () -> Unit>()
         if (r.isEmpty) {
+        blocks += {
             Panel {
                 Text("No data for this ${r.period.label.lowercase()} yet", style = MaterialTheme.typography.titleMedium)
                 Text("Mark prayers from the Prayers tab, a widget or the notification, or tap a day in the calendar to backfill. " +
                     "Your report fills in automatically.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Spacer(Modifier.height(12.dp))
+        }
         } else {
-            Totals(r)
-            Spacer(Modifier.height(12.dp))
+            blocks += { Totals(r) }
+        blocks += {
             Panel {
                 Text("Prayed vs missed", style = MaterialTheme.typography.titleMedium)
                 Legend()
                 BarChart(r)
             }
-            Spacer(Modifier.height(12.dp))
+        }
+        blocks += {
             Panel {
                 Text("By prayer (most missed first)", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 r.perPrayer.forEach { PrayerRow(it.prayer, it.counts, it.missedPct) }
             }
-            Spacer(Modifier.height(12.dp))
+        }
             if (r.insights.isNotEmpty()) {
+        blocks += {
                 Panel {
                     Text("Insights", style = MaterialTheme.typography.titleMedium)
                     r.insights.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
                 }
-                Spacer(Modifier.height(12.dp))
+        }
             }
         }
+        blocks += {
         Panel {
             Text("Calendar (tap a day to edit)", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Heat(r, s.today) { editDay = it }
         }
-        Spacer(Modifier.height(12.dp))
+        }
+        blocks += {
         Panel {
             Text("Streak history", style = MaterialTheme.typography.titleMedium)
             if (runs.isEmpty()) Text("Pray all five on a day to start your first streak.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -155,6 +162,16 @@ fun StreaksScreen(vm: StreaksViewModel = hiltViewModel()) {
                             style = MaterialTheme.typography.labelSmall, color = Gold)
                     }
                     Text("🔥 ${run.days} ${if (run.days == 1) "day" else "days"}", color = Gold, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        }
+        // Multi-column dashboard on tablets / the Fold inner screen; one column on phones.
+        val cols = LocalAdaptive.current.dashboardColumns
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            for (c in 0 until cols) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    blocks.filterIndexed { i, _ -> i % cols == c }.forEach { it() }
                 }
             }
         }

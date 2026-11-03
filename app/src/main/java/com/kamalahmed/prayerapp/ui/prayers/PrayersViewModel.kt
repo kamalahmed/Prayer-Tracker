@@ -32,6 +32,8 @@ data class PrayersUiState(
     val countUp: Duration?,
     val iqamaRemaining: Duration?,
     val others: List<PrayerEvent>,
+    /** Today's times for all five prayers plus Sunrise (two-pane list). */
+    val day: List<PrayerEvent> = emptyList(),
 )
 
 @HiltViewModel
@@ -64,6 +66,7 @@ class PrayersViewModel @Inject constructor(
             countUp = countUp,
             iqamaRemaining = iqama,
             others = Prayer.obligatory.filter { it != next.prayer }.map { PrayerEvent(it, today[it]) },
+            day = Prayer.entries.map { PrayerEvent(it, today[it]) },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 }

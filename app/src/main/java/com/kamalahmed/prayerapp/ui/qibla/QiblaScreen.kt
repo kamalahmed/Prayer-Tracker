@@ -46,6 +46,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import com.kamalahmed.prayerapp.ui.adaptive.AdaptiveMath
+import com.kamalahmed.prayerapp.ui.adaptive.LocalAdaptive
+import com.kamalahmed.prayerapp.ui.adaptive.SizedBox
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -117,14 +123,10 @@ fun QiblaScreen(vm: QiblaViewModel = hiltViewModel()) {
     val offBy = abs(angleDiff(qibla, heading))
     val aligned = offBy < 3f
 
-    Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Qibla", fontSize = 26.sp, color = Gold)
-        Text("${qibla.roundToInt()}° from true north · ${distance.roundToInt()} km to Makkah", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(8.dp))
-        AccuracyIndicator(if (hasSensor == 0) -1 else accuracy)
-        Spacer(Modifier.height(16.dp))
+    val turnText = if (aligned) "You are facing the Qibla" else "Turn ${if (angleDiff(qibla, heading) > 0) "right" else "left"} ${offBy.roundToInt()}°"
+    val compass: @Composable (Float) -> Unit = { d ->
         Box(
-            Modifier.fillMaxWidth().aspectRatio(1f).semantics {
+            Modifier.size(d.dp).semantics {
                 contentDescription = if (aligned) "Facing the Qibla" else "Turn ${if (angleDiff(qibla, heading) > 0) "right" else "left"} ${offBy.roundToInt()} degrees"
             },
             contentAlignment = Alignment.Center,
@@ -165,17 +167,45 @@ fun QiblaScreen(vm: QiblaViewModel = hiltViewModel()) {
                 drawCircle(Color.White, 8.dp.toPx(), center)
             }
         }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            if (aligned) "You are facing the Qibla" else "Turn ${if (angleDiff(qibla, heading) > 0) "right" else "left"} ${offBy.roundToInt()}°",
-            fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = if (aligned) AccentGreen else Color.White,
-        )
+    }
+    val header: @Composable () -> Unit = {
+        Text("Qibla", fontSize = 26.sp, color = Gold)
+        Text("${qibla.roundToInt()}° from true north · ${distance.roundToInt()} km to Makkah", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        AccuracyIndicator(if (hasSensor == 0) -1 else accuracy)
+    }
+    val footer: @Composable () -> Unit = {
+        Text(turnText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = if (aligned) AccentGreen else Color.White)
         Text("Heading ${heading.roundToInt()}°", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             "Hold the phone flat, away from metal and magnets.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
         )
+    }
+
+    if (LocalAdaptive.current.twoPane) {
+        Row(Modifier.fillMaxSize().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            SizedBox(Modifier.weight(1.2f).fillMaxHeight()) { w, h ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { compass(AdaptiveMath.dialDiameter(w, h)) }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                header()
+                Spacer(Modifier.height(24.dp))
+                footer()
+            }
+        }
+    } else {
+        Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            header()
+            Spacer(Modifier.height(12.dp))
+            SizedBox(Modifier.fillMaxWidth().weight(1f)) { w, h ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { compass(AdaptiveMath.dialDiameter(w, h, minDp = 160f)) }
+            }
+            Spacer(Modifier.height(12.dp))
+            footer()
+        }
     }
 }
 
