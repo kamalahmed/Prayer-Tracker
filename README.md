@@ -5,7 +5,7 @@ Defaults: Sharjah, UAE, using the Authority of Dubai calculation method.
 
 ## Features
 - Prayer times calculated offline. Supports several calculation methods, Asr madhab, high-latitude rules, per-prayer offsets and iqama times.
-- Shows the Hijri date, a Qibla compass, a monthly times table, and auto location with a geofence. You can also search for a city manually.
+- Shows the Hijri date, a Qibla compass, a monthly times table, and auto location with a geofence. You can also search ~70,000 cities worldwide offline (GeoNames) or enter coordinates manually.
 - Adhan alarms use exact alarms and a foreground playback service. Each prayer can use the bundled adhan, a system ringtone or a custom sound file, and the full length of the sound plays.
 - Full-screen alarm notifications are optional and turned on in Settings.
 - **Streaks tab** (bottom navigation: Prayers · Times · Streaks · Qibla · Settings): current/best streak, today's tracker, and a Week / Month / Year statistics report with prev/next navigation. It shows prayed vs missed and on time vs late with completion %, a stacked bar chart with a completion trend line, a most-missed ranking with per-prayer on-time rate, the change vs the previous period, a calendar heatmap (tap any past day to backfill or edit it), streak history and insights. Tracking is backed by Room; mark prayers from the notification ("Prayed ✓"), a widget or the app. Unmarked prayers count as missed only once their time has passed, and only from the first tracked day.
@@ -67,12 +67,14 @@ Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) an
 | RECEIVE_BOOT_COMPLETED | Reschedule after reboot, app update, time or timezone change |
 | WAKE_LOCK, VIBRATE | Alarm delivery |
 | REQUEST_IGNORE_BATTERY_OPTIMIZATIONS | Optional, asked in onboarding so alarms are reliable |
-| INTERNET | City search (geocoding), update checks |
+| INTERNET | Update checks (city search is fully offline) |
 
 ## Attribution
 The bundled adhan recordings are public domain (CC0) and come from Wikimedia Commons:
 - "Beautiful adhan.ogg" by Adam-synagda
 - "Adhan.ogg" by Aishatu98
+
+City search uses a bundled offline copy of the GeoNames `cities5000` dataset (all places with population ≥ 5,000, ~70k cities, with admin regions, time zones and Latin-script alternate names), © GeoNames (https://www.geonames.org/), licensed under CC BY 4.0. The asset `app/src/main/assets/cities.tsv.gz` (~3.3 MB) is regenerated with `tools/build_cities.py` from `cities5000.txt`, `admin1CodesASCII.txt` and `countryInfo.txt` downloaded from https://download.geonames.org/export/dump/.
 
 
 ## Development

@@ -37,7 +37,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.widget.Toast
-import com.kamalahmed.prayerapp.core.location.Cities
 import com.kamalahmed.prayerapp.core.model.AsrMethod
 import com.kamalahmed.prayerapp.core.model.HighLatitudeRule
 import com.kamalahmed.prayerapp.core.model.Prayer
@@ -135,7 +134,6 @@ fun CalculationScreen(vm: SettingsViewModel, onBack: () -> Unit) {
 fun LocationScreen(vm: SettingsViewModel, onBack: () -> Unit) {
     val s = vm.settings.collectAsStateWithLifecycle().value ?: return
     Messages(vm)
-    var query by rememberSaveable { mutableStateOf("") }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
         if (r.values.any { it }) { vm.update { it.copy(autoLocation = true) }; vm.refreshLocation() }
         else vm.message.value = "Location permission denied – choose a city instead"
@@ -171,15 +169,11 @@ fun LocationScreen(vm: SettingsViewModel, onBack: () -> Unit) {
             }
             SectionHeader("Choose a city")
             CardGroup {
-                OutlinedTextField(
-                    value = query, onValueChange = { query = it }, singleLine = true,
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    label = { Text("Search cities") }, modifier = Modifier.fillMaxWidth().padding(12.dp),
-                )
-                Cities.search(query).take(40).forEachIndexed { i, c ->
-                    if (i > 0) RowDivider()
-                    RadioRow(c.display, !s.autoLocation && s.cityName == c.name, c.tz) { vm.setCity(c) }
-                }
+                CitySearch(selectedLabel = s.cityName.takeIf { !s.autoLocation }, onPick = { vm.setCity(it) })
+            }
+            SectionHeader("Enter coordinates")
+            CardGroup {
+                ManualCoordinates { la, lo -> vm.setManualLocation(la, lo, null) }
             }
         }
     }
@@ -255,6 +249,8 @@ fun AppScreen(vm: SettingsViewModel, onBack: () -> Unit, onOnboarding: () -> Uni
                 ListRow("Prayer App", subtitle = "Version ${com.kamalahmed.prayerapp.BuildConfig.VERSION_NAME} · offline prayer times, adhan, widgets and tracker")
                 RowDivider()
                 ListRow("Adhan recordings", subtitle = "\"Beautiful adhan.ogg\" by Adam-synagda and \"Adhan.ogg\" by Aishatu98, Wikimedia Commons, CC0 (public domain)")
+                RowDivider()
+                ListRow("City database", subtitle = "World cities from GeoNames (geonames.org), licensed CC BY 4.0. Bundled offline.")
                 RowDivider()
                 ListRow("Privacy", subtitle = "No accounts, no analytics. Location stays on the device and is only used to calculate times.")
             }

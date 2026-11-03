@@ -60,7 +60,17 @@ class SettingsViewModel @Inject constructor(
     fun hasLocationPermission() = location.hasPermission()
 
     fun setCity(c: com.kamalahmed.prayerapp.core.location.City) = update {
-        it.copy(autoLocation = false, latitude = c.lat, longitude = c.lng, cityName = c.name, timeZoneId = c.tz)
+        it.copy(autoLocation = false, latitude = c.lat, longitude = c.lng, cityName = c.label, timeZoneId = c.tz)
+    }
+
+    /** Manual coordinates; the time zone comes from the nearest bundled city unless one is given. */
+    fun setManualLocation(lat: Double, lng: Double, tz: String?) = viewModelScope.launch {
+        val near = withContext(Dispatchers.Default) { com.kamalahmed.prayerapp.core.location.CityDatabase.get(app).nearest(lat, lng) }
+        repo.update {
+            it.copy(autoLocation = false, latitude = lat, longitude = lng,
+                cityName = near?.let { c -> "Near ${c.label}" } ?: String.format(java.util.Locale.US, "%.4f, %.4f", lat, lng),
+                timeZoneId = tz ?: near?.tz ?: it.timeZoneId)
+        }
     }
 
     /** Back to defaults but keep onboarding finished. */

@@ -56,7 +56,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kamalahmed.prayerapp.R
 import com.kamalahmed.prayerapp.alarm.SystemStatus
-import com.kamalahmed.prayerapp.core.location.Cities
 import com.kamalahmed.prayerapp.ui.common.CardGroup
 import com.kamalahmed.prayerapp.ui.common.ListRow
 import com.kamalahmed.prayerapp.ui.common.RowDivider
@@ -129,14 +128,9 @@ fun OnboardingScreen(vm: SettingsViewModel) {
                     msg?.let { Text(it, color = Gold, modifier = Modifier.padding(top = 8.dp)) }
                     Text("Or pick a city", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
                     CardGroup {
-                        Cities.all.take(12).forEachIndexed { i, c ->
-                            if (i > 0) RowDivider()
-                            ListRow(c.display, onClick = { vm.setCity(c) }, showChevron = false) {
-                                if (!s.autoLocation && s.cityName == c.name) Icon(Icons.Filled.CheckCircle, contentDescription = "Selected", tint = AccentGreen)
-                            }
-                        }
+                        com.kamalahmed.prayerapp.ui.settings.CitySearch(s.cityName.takeIf { !s.autoLocation }, onPick = { vm.setCity(it) }, limit = 8)
                     }
-                    Body("More cities in Settings → Location.")
+                    Body("You can also enter coordinates in Settings → Location.")
                 }
                 2 -> {
                     StepIcon(Icons.Filled.Notifications)
