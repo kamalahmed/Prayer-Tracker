@@ -14,6 +14,12 @@ import javax.inject.Singleton
 class UpdatePrefs @Inject constructor(@ApplicationContext ctx: Context) {
     private val sp = ctx.getSharedPreferences("updater", Context.MODE_PRIVATE)
 
+    init {
+        // One-time beta.9 migration, including previously disabled installs. Subsequent opt-out is respected.
+        if (!sp.getBoolean("auto_migrated_beta9",false)) sp.edit {
+            putBoolean(K_AUTO,true); putBoolean("auto_migrated_beta9",true); remove("notified_tag")
+        }
+    }
     private val _autoCheck = MutableStateFlow(sp.getBoolean(K_AUTO, true))
     val autoCheck: StateFlow<Boolean> = _autoCheck
     private val _wifiOnly = MutableStateFlow(sp.getBoolean(K_WIFI, false))
@@ -27,6 +33,29 @@ class UpdatePrefs @Inject constructor(@ApplicationContext ctx: Context) {
     fun setWifiOnly(v: Boolean) { sp.edit { putBoolean(K_WIFI, v) }; _wifiOnly.value = v }
     fun setIncludeBeta(v: Boolean) { sp.edit { putBoolean(K_BETA, v) }; _includeBeta.value = v }
     fun markInstallPromptShown() { sp.edit { putBoolean(K_PROMPT, true) }; _promptShown.value = true }
+
+    var lastAttempt: Long
+        get() = sp.getLong("last_attempt",0)
+        set(v) = sp.edit { putLong("last_attempt",v) }
+    private val _accepted = MutableStateFlow(sp.getString("accepted_release",null))
+    val accepted: StateFlow<String?> = _accepted
+    var acceptedJson: String?
+        get() = _accepted.value
+        set(v) { sp.edit { putString("accepted_release",v) }; _accepted.value = v }
+    fun acceptedRelease(): ReleaseInfo? = acceptedJson?.let { runCatching { ReleaseParser.parseRelease(org.json.JSONObject(it)) }.getOrNull() }
+    var verifiedHash: String?
+        get() = sp.getString("verified_hash",null)
+        set(v) = sp.edit { putString("verified_hash",v) }
+    var verifiedKey: String?
+        get() = sp.getString("verified_key",null)
+        set(v) = sp.edit { putString("verified_key",v) }
+    private val _later = MutableStateFlow(sp.getString("later_key",null))
+    val later: StateFlow<String?> = _later
+    fun defer(key: String) {
+        sp.edit { putString("later_key",key); putLong("later_until",System.currentTimeMillis()+60*60_000L) }; _later.value = key
+    }
+    fun isDeferred(key: String): Boolean = _later.value == key && System.currentTimeMillis() < sp.getLong("later_until",0)
+    fun clearExpiredDeferral() { if (System.currentTimeMillis() >= sp.getLong("later_until",0)) _later.value = null }
 
     var lastCheck: Long
         get() = sp.getLong("last_check", 0)

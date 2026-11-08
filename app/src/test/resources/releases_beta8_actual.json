@@ -1,0 +1,186 @@
+[
+  {
+    "tag_name": "v0.1.0-beta.8",
+    "name": "v0.1.0-beta.8",
+    "prerelease": true,
+    "draft": false,
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.1.0-beta.8",
+    "published_at": "2026-11-08T12:59:44Z",
+    "body": "## Prayer App 0.1.0-beta.8\n\n- **New: Tasbih counter** (Streaks \u203a Nafl \u203a Count). Choose Istighfar, Durud/Salawat, SubhanAllah, Alhamdulillah, Allahu Akbar, La ilaha illallah or your own counter. Optional daily targets; a large tap area, tap haptics, target vibration, optional volume-key counting, \u22121 and confirmed session reset. Daily counts persist; reset removes this screen's session taps, not earlier/widget counts.\n- **Counter statistics.** View per-item daily counts and week/month/year totals and charts, plus combined counter totals in the Nafl dashboard. Customize worship lets you choose checkbox or counter, rename/hide items and set a personal target without deleting history.\n- **New: Tasbih widget.** Select a different counter for each widget instance. Tap to add one or use \u22121 directly on the home screen, without opening the app; live Room flows keep counts current.\n- **Quran reminder clock.** Time controls and displays now use 12-hour AM/PM, including correct midnight/noon handling.\n- **Independent iqamah reminders.** Settings \u203a Iqamah supports minutes after adhan or a fixed clock time per prayer, plus an optional Friday Jumu'ah override. Separately enable each notification and choose how many minutes before iqamah to remind (0 = at iqamah). Off by default, independent of adhan notification modes, and re-armed after reboot, app update and time changes. Android notification, exact-alarm, DND and battery policies still apply.\n- **Widget timing choices.** Choose Start, Iqamah or Both per prayer widget. The new larger Adhan + Iqamah widget shows prayer / adhan / iqamah columns. Iqamah countdowns use the actual iqamah time.\n- **Safe upgrade.** Additive Room 3\u21924 migration preserves prayer, Qada, Nafl, Quran reading and reminder history; atomic counter transactions prevent lost app/widget taps.\n\nInstall over beta 7; existing settings and history are kept. Verified with 180 passing unit/Robolectric tests, lint with 0 errors, and a signed release build. Self-review: docs/REVIEW_beta8.md. Real-device upgrade, launcher behavior, volume-key/haptic feel, reboot delivery and notification sound still need device testing. Session ownership restarts after process death; daily totals remain saved.\n\nSHA-256: 625851ad6c429db37675ae332796a1e6cce836bb082b8850c2835745d62eccbb\nversionCode: 9\n",
+    "assets": [
+      {
+        "name": "PrayerApp-v0.1.0-beta.8.apk",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.8/PrayerApp-v0.1.0-beta.8.apk",
+        "size": 7820747,
+        "content_type": "application/vnd.android.package-archive"
+      },
+      {
+        "name": "PrayerApp-v0.1.0-beta.8.apk.sha256",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.8/PrayerApp-v0.1.0-beta.8.apk.sha256",
+        "size": 94,
+        "content_type": "application/octet-stream"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1.0-beta.7",
+    "name": "v0.1.0-beta.7",
+    "prerelease": true,
+    "draft": false,
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.1.0-beta.7",
+    "published_at": "2026-11-08T12:13:14Z",
+    "body": "## Prayer App 0.1.0-beta.7\n\n- **New: Nafl tracker** (Streaks \u203a Nafl). Track the 12 daily Sunnah rakaat: 2 before Fajr, 4 before and 2 after Dhuhr, 2 after Maghrib and 2 after Isha. Enable optional slots such as 4 before Asr or Witr without changing the 12-rakaat baseline.\n- **Your daily optional worship.** Log Quran reading (with optional pages/minutes), Tahajjud, tasbih/dhikr, ruqyah and Duha. Add your own items, rename them, or hide ones you do not use without losing history. Check off today or backfill a past day.\n- **Nafl statistics.** Browse week/month/year counts, per-item and per-slot completion rates, current streaks, daily Sunnah rakaat charts, a calendar heatmap and monthly Quran reading days. Uses the same dashboard style as Stats and Qada, with phone and wide-screen layouts.\n- **Quran reading reminders.** Set up to 12 daily times. Reminders are off until you enable them. Choose a normal notification or the Android default alarm tone as a notification sound (not a continuous/full-screen adhan alarm). Times are re-armed after reboot, app update and time-zone changes. Android notification permissions, DND and battery policies still apply.\n- **Safe upgrade.** Room 2\u21923 adds the new tracker without changing prayer or Qada history. Invalid input is handled gracefully, and a failed tracker load offers Retry rather than deleting saved data.\n\nInstall over beta 6; your settings, prayer history, Qada tracker and streaks are kept. Verified with 157 passing unit/Robolectric tests, lint with 0 errors, and a signed release build. Real-device upgrade, reboot delivery and notification/sound behavior still need device testing.\n\nSHA-256: 7fabd068e1d38cd6c716880f37787101df93095f3a26b221c38225581fa55b52\nversionCode: 8\n",
+    "assets": [
+      {
+        "name": "PrayerApp-v0.1.0-beta.7.apk",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.7/PrayerApp-v0.1.0-beta.7.apk",
+        "size": 7785718,
+        "content_type": "application/vnd.android.package-archive"
+      },
+      {
+        "name": "PrayerApp-v0.1.0-beta.7.apk.sha256",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.7/PrayerApp-v0.1.0-beta.7.apk.sha256",
+        "size": 94,
+        "content_type": "application/octet-stream"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1.0-beta.6",
+    "name": "v0.1.0-beta.6",
+    "prerelease": true,
+    "draft": false,
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.1.0-beta.6",
+    "published_at": "2026-11-08T10:56:23Z",
+    "body": "## Prayer App 0.1.0-beta.6\n\n- **Qibla compass on more phones.** Phones without a gyroscope (like the Galaxy A15) now use the magnetometer and accelerometer directly, so the compass works instead of saying \"No compass sensor\". The screen now tells you when the compass needs calibration (move the phone in a figure-8), when the sensor isn't sending data, or, only if the phone truly has no magnetic sensor, shows the Qibla bearing to use with any compass. It also shows which location it's using, with a shortcut to change it or allow location access.\n- **Widgets stay live.** Tapping a prayer on a widget now updates it straight away, and marking a prayer in the app or from a notification updates every widget too.\n- **Redesigned stats.** New dashboard with summary cards, a completion ring, charts with proper scales and labels, a completion and on-time trend, a per-prayer breakdown and a full-year calendar grid. Periods before you started tracking are shown as \"no data\" instead of empty bars. Works on phones, the Fold and tablets.\n- **New: Qada tracker** (Streaks tab \u203a Qada). Enter how many prayers you owe, or calculate it from a number of years or a date range. Log make-up prayers with +1, +N or \"+1 full day\", undo mistakes, and see your progress, days covered, pace, estimated finish date and weekly/monthly charts. Optional daily goal reminder (off by default).\n\nInstall it over beta 5 with the in-app update. Your settings, tracker history and streaks are kept.\n\nSHA-256: 096bc3bc87a948250070b710137e514ddea19a432dcee16684a3eab05fb39703\nversionCode: 7\n",
+    "assets": [
+      {
+        "name": "PrayerApp-v0.1.0-beta.6.apk",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.6/PrayerApp-v0.1.0-beta.6.apk",
+        "size": 7752906,
+        "content_type": "application/vnd.android.package-archive"
+      },
+      {
+        "name": "PrayerApp-v0.1.0-beta.6.apk.sha256",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.6/PrayerApp-v0.1.0-beta.6.apk.sha256",
+        "size": 94,
+        "content_type": "application/octet-stream"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1.0-beta.5",
+    "name": "v0.1.0-beta.5",
+    "prerelease": true,
+    "draft": false,
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.1.0-beta.5",
+    "published_at": "2026-11-03T20:46:57Z",
+    "body": "## Prayer App 0.1.0-beta.5\n\nReliability and security hardening after a full code review.\n\n- **Fixed: crash at high latitudes.** In places like London in summer, or near the poles, some prayer times can't be calculated, and the app crashed. Those times are now estimated with a high-latitude fallback.\n- **Small errors no longer close the app.** Alarms, widgets, background updates and every screen now catch errors and show a short message. If a prayer alarm can't start the adhan player, it still beeps. Later alarms are always re-armed.\n- **Safer updates.** Updates must come over HTTPS from GitHub, include a SHA-256 checksum, be a newer version, and be signed with the same key as the installed app.\n- **New: Settings > App > Diagnostics.** Shows the last crash (stored only on your phone) and lets you copy diagnostics to share.\n- The day you mark a prayer as prayed from a notification now follows your chosen time zone.\n\nInstall it over beta 4 with the in-app update. Your settings and streaks are kept.\n\nSHA-256: 3c0bc94b7ada180fb11768fae16ef342f92bac266d22281daea143f605bf97f1\nversionCode: 6\n",
+    "assets": [
+      {
+        "name": "PrayerApp-v0.1.0-beta.5.apk",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.5/PrayerApp-v0.1.0-beta.5.apk",
+        "size": 7687370,
+        "content_type": "application/vnd.android.package-archive"
+      },
+      {
+        "name": "PrayerApp-v0.1.0-beta.5.apk.sha256",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.5/PrayerApp-v0.1.0-beta.5.apk.sha256",
+        "size": 94,
+        "content_type": "application/octet-stream"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1.0-beta.4",
+    "name": "v0.1.0-beta.4",
+    "prerelease": true,
+    "draft": false,
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.1.0-beta.4",
+    "published_at": "2026-11-03T20:29:54Z",
+    "body": "## Prayer App 0.1.0-beta.4\n\nFixes from testing beta 3 on a Galaxy Z Fold.\n\n- **Fixed: Settings > Location crashed the app.** The offline city list is stored in the project as `cities.tsv.gz`, but the Android build tools unpack `.gz` assets when packaging, so the app looked for a file that wasn't in the APK. The app now finds the packaged file. If the city list ever fails to load, the page shows a message instead of closing the app.\n- **Settings on wide screens:** the selected item in the left list is now highlighted with a tinted rounded background and accent text. \"Prayer alerts & adhan\" is highlighted when Settings first opens.\n\nInstall it over beta 3 with the in-app update. Your settings and streaks are kept.\n\nSHA-256: d6dafd725a7c02c2da979a6518f2ab00cbd12fc8db9154763038fa1509fafb6b\nversionCode: 5\n",
+    "assets": [
+      {
+        "name": "PrayerApp-v0.1.0-beta.4.apk",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.4/PrayerApp-v0.1.0-beta.4.apk",
+        "size": 7666774,
+        "content_type": "application/vnd.android.package-archive"
+      },
+      {
+        "name": "PrayerApp-v0.1.0-beta.4.apk.sha256",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.4/PrayerApp-v0.1.0-beta.4.apk.sha256",
+        "size": 94,
+        "content_type": "application/octet-stream"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1.0-beta.3",
+    "name": "v0.1.0-beta.3",
+    "prerelease": true,
+    "draft": false,
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.1.0-beta.3",
+    "published_at": "2026-11-03T19:07:52Z",
+    "body": "# Prayer App v0.1.0-beta.3\n\n**What's new**\n- **Search any city in the world, even offline.** About 70,000 cities are built in (GeoNames), including Sylhet, Dhaka, Sharjah, London, New York and Jakarta. You can also type exact coordinates or keep using Automatic location.\n- **Tablets and foldables:** a side navigation rail, a prayer ring sized to fit the screen, and two-pane Prayers, Times and Qibla screens. Streaks shows several columns and Settings shows list and detail side by side. Unfolding or rotating keeps your place.\n- **Widgets:** fixed a bug where a widget sometimes changed to show only one prayer after you locked the phone or folded/unfolded it. The widget frame now fits its content better. A new \"Always show full layout\" option keeps every prayer visible even at small sizes.\n- **Removed** the Masjid locator. Its map could freeze the app.\n\nInstall over beta.2. Your settings and streaks are kept.\n\nSHA-256: 5a946e263e4a0fff5c1bfefec75f1797213e4d8e72ef6c046bf2ac95a0ccad3d\nversionCode: 4\n",
+    "assets": [
+      {
+        "name": "PrayerApp-v0.1.0-beta.3.apk",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.3/PrayerApp-v0.1.0-beta.3.apk",
+        "size": 7650394,
+        "content_type": "application/vnd.android.package-archive"
+      },
+      {
+        "name": "PrayerApp-v0.1.0-beta.3.apk.sha256",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.3/PrayerApp-v0.1.0-beta.3.apk.sha256",
+        "size": 94,
+        "content_type": "application/octet-stream"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1.0-beta.2",
+    "name": "Prayer App v0.1.0-beta.2",
+    "prerelease": true,
+    "draft": false,
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.1.0-beta.2",
+    "published_at": "2026-11-02T21:19:09Z",
+    "body": "- **Nearby Masjids is back.** It uses OpenStreetMap, so no account or key is needed. Results are sorted by distance, and tapping one opens it in your maps app. It works from a saved copy for 24 hours and tells you clearly when you're offline.\n- **Streaks is now its own tab.** You get Week, Month and Year stats with charts, on-time rate, your most-missed prayers, current and best streak, streak history, a heatmap and insights. Tap any past day to fix what you marked.\n- **Widget opacity fixed.** 0% is now fully transparent on every widget and theme, and 100% is fully solid.\n- **Widget spacing.** Vertical padding, horizontal padding and item spacing are now separate sliders, and each can go down to 0. You can also position the widget at the top, centre or bottom of its cell. The background no longer stretches to fill tall cells, and row widgets can be 1 cell tall.\n\nSHA-256: d67918ce4fff8b178cf858e46fec0895bdc3361b364aa2b2b587e1d10752672d\nversionCode: 3\n",
+    "assets": [
+      {
+        "name": "PrayerApp-v0.1.0-beta.2.apk",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.2/PrayerApp-v0.1.0-beta.2.apk",
+        "size": 4391043,
+        "content_type": "application/vnd.android.package-archive"
+      },
+      {
+        "name": "PrayerApp-v0.1.0-beta.2.apk.sha256",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.2/PrayerApp-v0.1.0-beta.2.apk.sha256",
+        "size": 94,
+        "content_type": "application/octet-stream"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1.0-beta.1",
+    "name": "Prayer App v0.1.0-beta.1",
+    "prerelease": true,
+    "draft": false,
+    "html_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/tag/v0.1.0-beta.1",
+    "published_at": "2026-11-02T08:28:43Z",
+    "body": "First beta of Prayer App (native Android, Kotlin).\n\n**Install:** download `PrayerApp-v0.1.0-beta.1.apk` below and open it on your phone (allow \"Install unknown apps\" when asked). Later updates can be installed from inside the app: Settings > App > Updates.\n\nHighlights: prayer times (Authority of Dubai/UAE and other methods), countdown ring, Qibla, adhan alarms with ringtone/custom sound and long playback, optional full-screen alarm, prayer streak tracker, six customizable home-screen widgets, in-app updater.\n\nSHA-256: 7c0463eb0beebd5bb47d7b7cf27d1214fa6fd5fedfaa47b814044e3d06c1baae\nversionCode: 2\n",
+    "assets": [
+      {
+        "name": "PrayerApp-v0.1.0-beta.1.apk",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.1/PrayerApp-v0.1.0-beta.1.apk",
+        "size": 4374667,
+        "content_type": "application/vnd.android.package-archive"
+      },
+      {
+        "name": "PrayerApp-v0.1.0-beta.1.apk.sha256",
+        "browser_download_url": "https://github.com/kamalahmed/Prayer-Tracker/releases/download/v0.1.0-beta.1/PrayerApp-v0.1.0-beta.1.apk.sha256",
+        "size": 94,
+        "content_type": "application/octet-stream"
+      }
+    ]
+  }
+]

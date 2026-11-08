@@ -20,6 +20,7 @@ data class ReleaseInfo(
     /** Optional "versionCode: N" line in the notes. */
     val versionCode: Int?,
 ) {
+    val key: String get() = "$tag:${versionCode ?: 0}"
     val version: String get() = tag.removePrefix("v").removePrefix("V")
 }
 
@@ -57,6 +58,17 @@ object ReleaseParser {
             notesSha256 = SHA_RX.find(body)?.groupValues?.get(1)?.lowercase(),
             versionCode = CODE_RX.find(body)?.groupValues?.get(1)?.toIntOrNull(),
         )
+    }
+
+    /** Small durable handoff for an explicitly accepted release; same parser/security rules apply. */
+    fun toJson(r: ReleaseInfo): JSONObject = JSONObject().apply {
+        put("tag_name",r.tag); put("name",r.name); put("body",r.notes)
+        put("prerelease",r.prerelease); put("draft",r.draft); put("html_url",r.htmlUrl); put("published_at",r.publishedAt)
+        put("assets",JSONArray().apply {
+            listOfNotNull(r.apk,r.sha256Asset).forEach { a -> put(JSONObject().apply {
+                put("name",a.name); put("browser_download_url",a.url); put("size",a.size); put("content_type",a.contentType)
+            }) }
+        })
     }
 
     /** Extracts the hash from a `sha256sum`-style file ("<hex>  name.apk") or a bare hex string. */

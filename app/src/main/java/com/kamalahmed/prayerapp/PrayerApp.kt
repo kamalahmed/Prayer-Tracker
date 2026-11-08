@@ -27,6 +27,7 @@ class PrayerApp : Application(), Configuration.Provider {
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var scheduler: AlarmScheduler
     @Inject lateinit var hooks: AlarmHooks
+    @Inject lateinit var updateManager: com.kamalahmed.prayerapp.update.UpdateManager
     @Inject lateinit var updatePrefs: com.kamalahmed.prayerapp.update.UpdatePrefs
     @Inject lateinit var tracker: com.kamalahmed.prayerapp.tracker.TrackerRepository
 
@@ -48,6 +49,17 @@ class PrayerApp : Application(), Configuration.Provider {
         guard(TAG, "update worker") { com.kamalahmed.prayerapp.update.UpdateWorker.schedule(this, updatePrefs.autoCheck.value, updatePrefs.wifiOnly.value) }
         guard(TAG, "reschedule worker") { RescheduleWorker.enqueue(this) }
         appScope.launch { guard(TAG, "Quran reminders") { quranReminders.reschedule() } }
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityResumed(activity: android.app.Activity) {
+                appScope.launch { guard(TAG,"resume update check") { updateManager.checkAutomatic() } }
+            }
+            override fun onActivityCreated(a: android.app.Activity,b: android.os.Bundle?) = Unit
+            override fun onActivityStarted(a: android.app.Activity) = Unit
+            override fun onActivityPaused(a: android.app.Activity) = Unit
+            override fun onActivityStopped(a: android.app.Activity) = Unit
+            override fun onActivitySaveInstanceState(a: android.app.Activity,b: android.os.Bundle) = Unit
+            override fun onActivityDestroyed(a: android.app.Activity) = Unit
+        })
         // Any settings change (method, location, modes, reminders…) re-arms alarms and refreshes widgets.
         appScope.launch {
             settings.settings.distinctUntilChanged().debounce(400).collect {

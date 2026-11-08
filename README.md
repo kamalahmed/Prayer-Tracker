@@ -19,6 +19,7 @@ Defaults: Sharjah, UAE, using the Authority of Dubai calculation method.
 - Onboarding walks through location, notifications, exact alarm, battery and full-screen permissions.
 
 ## Diagnostics
+Updater diagnosis and fixes: `docs/REVIEW_beta9.md`.
 If the app crashes, a local crash log is saved on the device. It is never uploaded. Open **Settings > App > Diagnostics** to view it or copy it. See `docs/REVIEW_beta5.md` for the hardening review and `docs/REVIEW_beta7.md` for the Nafl/reminder self-review, plus `docs/REVIEW_beta8.md` for counters and iqamah.
 
 ## Build
@@ -53,7 +54,9 @@ Keep the keystore backed up: every future update must be signed with the same ke
 ## In-app updates
 - Settings → App → **Updates** shows the current version and a **Check for updates** button. The app asks the public GitHub Releases API (`kamalahmed/Prayer-Tracker`, unauthenticated, ETag-cached; rate limits and offline are reported gracefully).
 - When a newer release is found you see **Update available** with the release notes, plus a banner on the Settings and More screens. One tap downloads the APK (progress, pause/resume, cancel), verifies its size and SHA-256 (from a `<apk>.sha256` asset, or a `SHA-256: <hex>` line in the notes), and installs it with the PackageInstaller session API. The first time, the app guides you to allow "Install unknown apps", and Android shows its own confirmation dialog.
-- **Auto-check daily** (default on) runs a WorkManager job and posts a notification when a new version appears. A **Wi-Fi only** option is available.
+- **Automatic update checks** are on by default (existing installs are migrated on once). Every app/Activity resume checks when connected, with a persisted five-minute attempt throttle; WorkManager also checks about every 15 minutes when connected. Android may delay periodic work in Doze. A **Wi-Fi only** option is available, and future opt-outs are respected.
+- **Today** shows an Update / Later banner, and system notifications have an Update action. Later snoozes that release for an hour. Denied notification permission/muted channels never consume a release's notification key; the in-app banner remains available.
+- Accepting an update starts a durable foreground WorkManager download with progress. Once verified, a resumed app continues to Android's installer; if finished in the background, a ready notification opens the flow. An Install unknown apps guide handles permission and resumes after returning. Size/SHA-256/package/higher-code/signer checks remain mandatory, including a fresh cached-file hash check before installation.
 - **Include beta releases** is on by default while the installed version is a beta.
 - Version comparison is semver (`0.1.0-beta.1 < 0.1.0-beta.2 < 0.1.0`). If names are equal, a `versionCode: N` line in the release notes breaks the tie.
 
@@ -63,7 +66,7 @@ Keep the keystore backed up: every future update must be signed with the same ke
 cp app/build/outputs/apk/release/app-release.apk PrayerApp-v0.2.0-beta.1.apk
 sha256sum PrayerApp-v0.2.0-beta.1.apk > PrayerApp-v0.2.0-beta.1.apk.sha256
 ```
-Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) and attach the `.apk` and `.apk.sha256` files. Optionally add `versionCode: 3` to the notes. The tag name must be the versionName with a `v` prefix. Defaults when the properties are omitted: `0.1.0-beta.8` / `9`.
+Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) and attach the `.apk` and `.apk.sha256` files. Optionally add `versionCode: 3` to the notes. The tag name must be the versionName with a `v` prefix. Defaults when the properties are omitted: `0.1.0-beta.9` / `10`.
 
 ## Permissions
 | Permission | Why |
@@ -72,7 +75,7 @@ Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) an
 | POST_NOTIFICATIONS | Prayer alerts |
 | SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM | Adhan fires on time |
 | USE_FULL_SCREEN_INTENT | Optional full-screen alarm (Settings) |
-| FOREGROUND_SERVICE(_MEDIA_PLAYBACK) | Plays the full adhan |
+| FOREGROUND_SERVICE(_MEDIA_PLAYBACK, _DATA_SYNC) | Full adhan playback and accepted background APK downloads |
 | RECEIVE_BOOT_COMPLETED | Reschedule after reboot, app update, time or timezone change |
 | WAKE_LOCK, VIBRATE | Alarm delivery |
 | REQUEST_IGNORE_BATTERY_OPTIMIZATIONS | Optional, asked in onboarding so alarms are reliable |

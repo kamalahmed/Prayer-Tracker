@@ -20,6 +20,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import com.kamalahmed.prayerapp.core.safety.guard
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -40,7 +43,7 @@ sealed interface UpdateState {
     }
     data class Downloaded(val release: ReleaseInfo, val file: File) : UpdateState
     data class Installing(val release: ReleaseInfo) : UpdateState
-    data class Error(val message: String, val release: ReleaseInfo? = null) : UpdateState
+    data class Error(val message: String, val release: ReleaseInfo? = null, val retryable: Boolean = false) : UpdateState
 }
 
 /**
@@ -52,10 +55,12 @@ class UpdateManager @Inject constructor(
     @ApplicationContext private val ctx: Context,
     val prefs: UpdatePrefs,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = com.kamalahmed.prayerapp.core.safety.safeScope("UpdateManager", Dispatchers.IO)
+    private val checks = Mutex()
+    private val downloads = Mutex()
+    val pendingConfirmation = MutableStateFlow<Intent?>(null)
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
-    private var downloadJob: Job? = null
     /** Seam for tests (offline, malformed JSON); production fetches from the GitHub API. */
     internal var releasesSource: () -> String = { fetchReleases() }
 
@@ -63,17 +68,35 @@ class UpdateManager @Inject constructor(
     val currentCode: Int get() = BuildConfig.VERSION_CODE
 
     init {
-        // Restore a known-available update (from the last check) so banners show without a network call.
-        prefs.cachedReleasesJson()?.let { json ->
-            runCatching { ReleaseParser.pickUpdate(ReleaseParser.parseList(json), prefs.includeBeta.value, currentVersion, currentCode) }
-                .getOrNull()?.let { _state.value = UpdateState.Available(it) }
+        guard(TAG,"restore update") {
+            val accepted = prefs.acceptedRelease()
+            val pending = accepted?.takeIf { it.apk != null && VersionCompare.isNewer(it.version,it.versionCode,currentVersion,currentCode) }
+            if (accepted != null && pending == null) prefs.acceptedJson = null
+            val rel = pending ?: prefs.cachedReleasesJson()?.let { json ->
+                ReleaseParser.pickUpdate(ReleaseParser.parseList(json),prefs.includeBeta.value,currentVersion,currentCode)
+            }
+            if (rel != null) _state.value = downloadedFileFor(rel)?.let { UpdateState.Downloaded(rel,it) } ?: UpdateState.Available(rel)
         }
     }
 
     /** Result of a check, used by both UI and the background worker. Never throws. */
-    suspend fun check(): UpdateState = withContext(Dispatchers.IO) {
+    suspend fun checkAutomatic(): UpdateState {
+        prefs.clearExpiredDeferral()
+        if (!prefs.autoCheck.value || !isOnline(prefs.wifiOnly.value)) return _state.value
+        return check(force = false)
+    }
+
+    suspend fun check(force: Boolean = true): UpdateState = withContext(Dispatchers.IO) { checks.withLock {
         val busy = _state.value
-        if (busy is UpdateState.Downloading || busy is UpdateState.Installing) return@withContext busy
+        if (busy is UpdateState.Downloading || busy is UpdateState.Installing || busy is UpdateState.Downloaded) {
+            if (busy is UpdateState.Downloaded) maybeNotify(busy)
+            return@withLock busy
+        }
+        if (!force && !UpdateThrottle.due(System.currentTimeMillis(),prefs.lastAttempt)) {
+            maybeNotify(busy)
+            return@withLock busy
+        }
+        prefs.lastAttempt = System.currentTimeMillis()
         _state.value = UpdateState.Checking
         val result = try {
             val json = releasesSource()
@@ -93,9 +116,74 @@ class UpdateManager @Inject constructor(
             com.kamalahmed.prayerapp.core.safety.CrashLog.nonFatal(TAG, "Release info unreadable", e)
             UpdateState.Error("Couldn't read release info.")
         }
-        _state.value = result
-        result
+        // A transient offline/rate-limit error must not erase a previously discovered update.
+        val visible = if (result is UpdateState.Error && busy is UpdateState.Available) busy else result
+        _state.value = visible
+        maybeNotify(visible)
+        visible
+    } }
+
+    private fun maybeNotify(s: UpdateState) {
+        val rel = (s as? UpdateState.Available)?.release ?: (s as? UpdateState.Downloaded)?.release ?: return
+        val key = if (s is UpdateState.Downloaded) "ready:${rel.key}" else rel.key
+        if (!prefs.isDeferred(rel.key) && prefs.notifiedTag != key && UpdateWorker.notify(ctx,rel,s is UpdateState.Downloaded)) prefs.notifiedTag = key
     }
+
+    internal fun notifyDownloaded(s: UpdateState.Downloaded) { maybeNotify(s) }
+
+    fun acceptUpdate(rel: ReleaseInfo) {
+        guard(TAG,"accept update") {
+            if (_state.value is UpdateState.Downloading || _state.value is UpdateState.Installing) return@guard
+            require(!rel.draft && rel.apk != null && VersionCompare.isNewer(rel.version,rel.versionCode,currentVersion,currentCode))
+            prefs.acceptedJson = ReleaseParser.toJson(rel).toString()
+            val ready = downloadedFileFor(rel)
+            if (ready != null) _state.value = UpdateState.Downloaded(rel,ready)
+            else {
+                try {
+                    _state.value = UpdateState.Downloading(rel,0,rel.apk.size)
+                    UpdateDownloadWorker.enqueue(ctx)
+                } catch (e: Exception) {
+                    prefs.acceptedJson = null
+                    _state.value = UpdateState.Error("Couldn't start background download. Tap Update to retry.",rel)
+                    com.kamalahmed.prayerapp.core.safety.CrashLog.nonFatal(TAG,"enqueue download",e)
+                }
+            }
+        }
+    }
+
+    fun acceptNotification(tag: String) = scope.launch {
+        guard(TAG,"notification action") {
+            val rel = prefs.acceptedRelease()?.takeIf { it.tag == tag }
+                ?: prefs.cachedReleasesJson()?.let { ReleaseParser.parseList(it).firstOrNull { r -> r.tag == tag } }
+            if (rel != null) acceptUpdate(rel)
+        }
+    }
+
+    fun later(rel: ReleaseInfo) { guard(TAG,"later") { prefs.defer(rel.key); if (prefs.acceptedRelease()?.key == rel.key) postponeInstall() } }
+    fun postponeInstall() { guard(TAG,"postpone install") { prefs.acceptedJson = null } }
+
+    internal fun downloadFailed(message: String) {
+        guard(TAG,"download failure") {
+            val rel = prefs.acceptedRelease() ?: return@guard
+            _state.value = UpdateState.Error(message,rel)
+        }
+    }
+
+    internal suspend fun downloadAccepted(): UpdateState = downloads.withLock {
+        val rel = prefs.acceptedRelease() ?: return@withLock _state.value
+        try {
+            _state.value = UpdateState.Downloading(rel,0,rel.apk?.size ?: 0)
+            val file = download(rel)
+            _state.value = UpdateState.Downloaded(rel,file)
+        } catch (e: CancellationException) { _state.value = UpdateState.Available(rel); throw e }
+        catch (e: Exception) {
+            com.kamalahmed.prayerapp.core.safety.CrashLog.nonFatal(TAG,"download",e)
+            val retry = e is UnknownHostException || e is java.net.SocketTimeoutException || e is java.net.SocketException
+            _state.value = UpdateState.Error(if (retry) "Download paused by the network; it will retry when connected." else e.message ?: "Download failed. Tap Update to retry.",rel,retry)
+        }
+        _state.value
+    }
+
 
     private class RateLimitException(msg: String) : IOException(msg)
 
@@ -140,32 +228,31 @@ class UpdateManager @Inject constructor(
     private fun fileFor(rel: ReleaseInfo) = File(updatesDir(), rel.apk!!.name.replace(Regex("[^A-Za-z0-9._-]"), "_"))
 
     private fun downloadedFileFor(rel: ReleaseInfo): File? =
-        fileFor(rel).takeIf { it.exists() && it.length() == rel.apk!!.size && prefs.verifiedApk == it.name }
+        fileFor(rel).takeIf { it.exists() && it.length() == rel.apk!!.size && prefs.verifiedApk == it.name && prefs.verifiedKey == rel.key && prefs.verifiedHash != null && (rel.notesSha256 == null || rel.notesSha256.equals(prefs.verifiedHash,true)) }
 
-    fun startDownload(rel: ReleaseInfo) {
-        if (downloadJob?.isActive == true) return
-        downloadJob = scope.launch {
-            try {
-                val file = download(rel)
-                _state.value = UpdateState.Downloaded(rel, file)
-            } catch (e: CancellationException) {
-                _state.value = UpdateState.Available(rel)
-            } catch (e: UnknownHostException) {
-                _state.value = UpdateState.Error("Download paused: you're offline. Tap Download to resume.", rel)
-            } catch (e: Exception) {
-                _state.value = UpdateState.Error(e.message ?: "Download failed", rel)
-            }
+    fun startDownload(rel: ReleaseInfo) = acceptUpdate(rel)
+
+    fun cancelDownload() {
+        guard(TAG,"pause download") {
+            val rel = prefs.acceptedRelease()
+            postponeInstall()
+            androidx.work.WorkManager.getInstance(ctx).cancelUniqueWork(UpdateDownloadWorker.NAME)
+            if (rel != null) _state.value = UpdateState.Available(rel)
         }
     }
 
-    fun cancelDownload() { downloadJob?.cancel() }
-
     /** Cancels and removes the partial file so the next download starts fresh. */
     fun discardDownload(rel: ReleaseInfo) {
-        downloadJob?.cancel()
-        File(updatesDir(), fileFor(rel).name + ".part").delete()
-        fileFor(rel).delete()
-        _state.value = UpdateState.Available(rel)
+        cancelDownload()
+        scope.launch {
+            downloads.withLock {
+                guard(TAG,"discard partial") {
+                    File(updatesDir(),fileFor(rel).name+".part").delete()
+                    fileFor(rel).delete()
+                    _state.value = UpdateState.Available(rel)
+                }
+            }
+        }
     }
 
     private suspend fun download(rel: ReleaseInfo): File {
@@ -240,6 +327,8 @@ class UpdateManager @Inject constructor(
         out.delete()
         if (!part.renameTo(out)) throw IOException("Couldn't save the update")
         prefs.verifiedApk = out.name
+        prefs.verifiedHash = actual
+        prefs.verifiedKey = rel.key
         return out
     }
 
@@ -260,6 +349,9 @@ class UpdateManager @Inject constructor(
 
     // ---------------- Install ----------------
 
+    fun onPendingConfirmation(intent: Intent) { pendingConfirmation.value = intent }
+    fun consumeConfirmation() { pendingConfirmation.value = null }
+
     fun canInstall(): Boolean = ctx.packageManager.canRequestPackageInstalls()
 
     fun unknownSourcesIntent(): Intent =
@@ -271,7 +363,15 @@ class UpdateManager @Inject constructor(
             try {
                 _state.value = UpdateState.Installing(rel)
                 // Re-check right before installing (the file may have been downloaded by an older app version).
-                UpdateSecurity.verifyDownloadedApk(ctx, file)
+                try {
+                    val expectedHash = UpdateSecurity.requireSha(prefs.verifiedHash)
+                    if (prefs.verifiedKey != rel.key || !sha256(file).equals(expectedHash,true)) throw IOException("Checksum changed since download. Download the update again.")
+                    UpdateSecurity.verifyDownloadedApk(ctx,file)
+                } catch (e: Exception) {
+                    // Do not leave a corrupt cached file in an endless Install -> failure loop.
+                    prefs.verifiedApk = null; prefs.verifiedHash = null; prefs.verifiedKey = null
+                    throw e
+                }
                 val installer = ctx.packageManager.packageInstaller
                 val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
                     setAppPackageName(ctx.packageName)
@@ -300,7 +400,9 @@ class UpdateManager @Inject constructor(
 
     /** Called by [InstallReceiver] with the PackageInstaller status. */
     internal fun onInstallStatus(status: Int, message: String?) {
-        val rel = (_state.value as? UpdateState.Installing)?.release
+        val rel = (_state.value as? UpdateState.Installing)?.release ?: prefs.acceptedRelease()
+        prefs.acceptedJson = null
+        pendingConfirmation.value = null
         _state.value = when (status) {
             PackageInstaller.STATUS_SUCCESS -> UpdateState.UpToDate
             PackageInstaller.STATUS_FAILURE_ABORTED ->
@@ -312,12 +414,12 @@ class UpdateManager @Inject constructor(
         }
     }
 
-    fun isOnline(wifiOnly: Boolean): Boolean {
-        val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return false
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
-        if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
-        return !wifiOnly || caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
-    }
+    fun isOnline(wifiOnly: Boolean): Boolean = guard(TAG,"connectivity") {
+        val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return@guard false
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return@guard false
+        if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return@guard false
+        !wifiOnly || caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    } ?: false
 
     companion object {
         private const val TAG = "UpdateManager"

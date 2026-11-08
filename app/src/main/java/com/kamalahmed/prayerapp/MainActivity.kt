@@ -11,6 +11,7 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @javax.inject.Inject lateinit var updater: com.kamalahmed.prayerapp.update.UpdateManager
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         enableEdgeToEdge()
@@ -18,7 +19,10 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
         setContent {
             PrayerTheme {
-                PrayerAppRoot()
+                androidx.compose.foundation.layout.Box {
+                    PrayerAppRoot()
+                    com.kamalahmed.prayerapp.update.UpdateInstallHost()
+                }
             }
         }
     }
@@ -29,11 +33,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(i: android.content.Intent?) {
+        i?.getStringExtra(EXTRA_ACCEPT_UPDATE)?.let { tag ->
+            i.removeExtra(EXTRA_ACCEPT_UPDATE)
+            updater.acceptNotification(tag)
+        }
         if (i?.getBooleanExtra(EXTRA_OPEN_UPDATES, false) == true) {
             i.removeExtra(EXTRA_OPEN_UPDATES)
             com.kamalahmed.prayerapp.update.UpdateNav.openRequested.value = true
         }
     }
 
-    companion object { const val EXTRA_OPEN_UPDATES = "open_updates" }
+    companion object { const val EXTRA_ACCEPT_UPDATE = "accept_update"; const val EXTRA_OPEN_UPDATES = "open_updates" }
 }

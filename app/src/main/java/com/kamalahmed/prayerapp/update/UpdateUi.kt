@@ -104,21 +104,7 @@ fun UpdateSection(vm: UpdateViewModel) {
     val auto by vm.prefs.autoCheck.collectAsStateWithLifecycle()
     val wifi by vm.prefs.wifiOnly.collectAsStateWithLifecycle()
     val beta by vm.prefs.includeBeta.collectAsStateWithLifecycle()
-    val promptShown by vm.prefs.installPromptShown.collectAsStateWithLifecycle()
-    var showPermissionGuide by remember { mutableStateOf(false) }
-    var pendingInstall by remember { mutableStateOf<UpdateState.Downloaded?>(null) }
     var showNotes by remember { mutableStateOf(false) }
-
-    // Returning from the "Install unknown apps" screen: continue the install if allowed now.
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        pendingInstall?.let { d -> if (vm.manager.canInstall()) { pendingInstall = null; vm.manager.install(d.release, d.file) } }
-    }
-
-    fun install(d: UpdateState.Downloaded) {
-        if (vm.manager.canInstall()) vm.manager.install(d.release, d.file)
-        else if (!promptShown) { pendingInstall = d; showPermissionGuide = true }
-        else { pendingInstall = d; runCatching { ctx.startActivity(vm.manager.unknownSourcesIntent()) } }
-    }
 
     SectionHeader("Updates")
     CardGroup {
@@ -156,37 +142,23 @@ fun UpdateSection(vm: UpdateViewModel) {
                             TextButton(onClick = { vm.manager.discardDownload(st.release) }) { Text("Cancel") }
                         }
                     }
-                    is UpdateState.Downloaded -> Button(onClick = { install(st) }, Modifier.fillMaxWidth()) { Text("Install update") }
+                    is UpdateState.Downloaded -> Button(onClick = { vm.manager.acceptUpdate(st.release) }, Modifier.fillMaxWidth()) { Text("Install update") }
                     is UpdateState.Installing -> Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(Modifier.width(20.dp), strokeWidth = 2.dp); Spacer(Modifier.width(10.dp)); Text("Installing… confirm in the system dialog")
                     }
-                    else -> Button(onClick = { vm.manager.startDownload(rel) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    else -> Button(onClick = { vm.manager.acceptUpdate(rel) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text(if (st is UpdateState.Error) "Retry download" else "Download & install")
                     }
                 }
             }
         }
         RowDivider()
-        SwitchRow("Auto-check daily", auto, subtitle = "Notify me when a new version is published") { vm.setAutoCheck(ctx, it) }
+        SwitchRow("Auto-check for updates", auto, subtitle = "On app resume (5-minute throttle) and about every 15 minutes when connected") { vm.setAutoCheck(ctx, it) }
         if (auto) { RowDivider(); SwitchRow("Wi-Fi only", wifi, subtitle = "Check only on unmetered networks") { vm.setWifiOnly(ctx, it) } }
         RowDivider()
         SwitchRow("Include beta releases", beta, subtitle = "Get pre-release builds from GitHub") { vm.setIncludeBeta(it) }
     }
 
-    if (showPermissionGuide) {
-        AlertDialog(
-            onDismissRequest = { showPermissionGuide = false },
-            title = { Text("Allow installing updates") },
-            text = { Text("To update itself, Prayer App needs Android's \"Install unknown apps\" permission. On the next screen, turn on \"Allow from this source\", then press Back. You only need to do this once.") },
-            confirmButton = {
-                Button(onClick = {
-                    vm.prefs.markInstallPromptShown(); showPermissionGuide = false
-                    runCatching { ctx.startActivity(vm.manager.unknownSourcesIntent()) }
-                }) { Text("Open settings") }
-            },
-            dismissButton = { OutlinedButton(onClick = { showPermissionGuide = false; pendingInstall = null }) { Text("Not now") } },
-        )
-    }
     if (showNotes) {
         val r = s.release()
         AlertDialog(

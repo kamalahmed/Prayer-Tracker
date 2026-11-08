@@ -1,5 +1,6 @@
 package com.kamalahmed.prayerapp.ui.nav
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -155,7 +156,12 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, back: () -> U
         if (openUpdates) { com.kamalahmed.prayerapp.update.UpdateNav.openRequested.value = false; nav.navigate(SettingsDest.APP.route) }
     }
     NavHost(nav, startDestination = TopDest.PRAYERS.route) {
-        composable(TopDest.PRAYERS.route) { PrayersScreen(trackerContent = { TodayTracker() }) }
+        composable(TopDest.PRAYERS.route) {
+            Column(Modifier.fillMaxSize()) {
+                com.kamalahmed.prayerapp.update.TodayUpdateBanner()
+                Box(Modifier.weight(1f)) { PrayersScreen(trackerContent = { TodayTracker() }) }
+            }
+        }
         composable(TopDest.STREAKS.route) { StreaksScreen() }
         composable(TopDest.TIMES.route) {
             TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) })
