@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -47,8 +48,7 @@ class TasbihActivity : ComponentActivity() {
                 LaunchedEffect(haptics) {
                     vm.feedback.collect { target ->
                         guard("Tasbih","vibration") {
-                            if (target) getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0,80,60,160),-1))
-                            else if (haptics) window.decorView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                            if(haptics) com.kamalahmed.prayerapp.nafl.CounterFeedback.play(this@TasbihActivity,target)
                         }
                     }
                 }
@@ -83,21 +83,26 @@ fun TasbihContent(ui: TasbihUi?,select: (String)->Unit,plus: ()->Unit,minus: ()-
         if (error != null) Text(error,color = MaterialTheme.colorScheme.error,style = MaterialTheme.typography.bodySmall)
         if (ui == null) { Text("Loading counters…"); return@Column }
         if (ui.item == null) { Text("No enabled counters. Add or enable a counter in Streaks → Nafl → Customize worship."); return@Column }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ui.items.forEach { item -> FilterChip(selected = item.id == ui.item.id,onClick = { confirmReset = false; select(item.id) },label = { Text(item.name) }) }
-        }
+        Text(ui.item.name,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
         Text("${ui.day} · daily total",style = MaterialTheme.typography.labelLarge)
         if (ui.item.dailyTarget > 0) {
-            LinearProgressIndicator(progress = { (ui.count.toFloat()/ui.item.dailyTarget).coerceIn(0f,1f) },modifier = Modifier.fillMaxWidth())
             Text("${ui.count} / ${ui.item.dailyTarget}" + if (ui.count >= ui.item.dailyTarget) " · Target reached ✓" else " · daily target")
         }
-        Box(Modifier.fillMaxWidth().heightIn(min = 240.dp).background(MaterialTheme.colorScheme.primaryContainer,RoundedCornerShape(32.dp))
-            .clickable(onClick = plus).semantics { contentDescription = "Count ${ui.item.name}, ${ui.count} today. Tap to add one" },contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally,modifier = Modifier.padding(24.dp)) {
-                Text("${ui.count}",fontSize = 64.sp,fontWeight = FontWeight.Bold,color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("TAP ANYWHERE HERE  +1",style = MaterialTheme.typography.labelLarge)
+        val pulse=remember { androidx.compose.animation.core.Animatable(1f) }
+        LaunchedEffect(ui.count,ui.item.id) { pulse.snapTo(1.035f);pulse.animateTo(1f,androidx.compose.animation.core.tween(180)) }
+        val progress=com.kamalahmed.prayerapp.nafl.CounterProgress.of(ui.count,ui.item.dailyTarget)
+        Box(Modifier.fillMaxWidth().heightIn(min=260.dp).background(MaterialTheme.colorScheme.surfaceContainer,RoundedCornerShape(32.dp))
+            .clickable(onClick=plus).semantics { contentDescription="Count ${ui.item.name}, ${ui.count} today. Tap to add one" },contentAlignment=Alignment.Center) {
+            Box(Modifier.padding(12.dp).size(236.dp).graphicsLayer { scaleX=pulse.value;scaleY=pulse.value },contentAlignment=Alignment.Center) {
+                CounterRing(ui.count,ui.item.dailyTarget,Modifier.fillMaxSize())
+                Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                    Text("${ui.count}",fontSize=if(ui.count>=100000) 36.sp else 52.sp,fontWeight=FontWeight.Bold,color=MaterialTheme.colorScheme.primary)
+                    Text(if(progress.hasTarget && progress.laps>0) "×${progress.laps} complete" else if(progress.hasTarget) "of ${progress.target}" else "Free count",style=MaterialTheme.typography.labelLarge)
+                    Text("TAP +1",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
+        Text(if(progress.hasTarget) "Each lap = ${progress.target}. Your daily total keeps growing after the target." else "No daily target · every tap is saved.",style=MaterialTheme.typography.bodySmall)
         Row(Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = minus,modifier = Modifier.weight(1f),enabled = ui.count > 0) { Text("Undo / −1") }
             OutlinedButton(onClick = { confirmReset = true },modifier = Modifier.weight(1f),enabled = ui.session > 0) { Text("Reset session") }
@@ -106,6 +111,10 @@ fun TasbihContent(ui: TasbihUi?,select: (String)->Unit,plus: ()->Unit,minus: ()-
         if (confirmReset) {
             Text("Remove ${ui.session} taps from this session? Daily history is otherwise kept.")
             Row { Button(onClick = { reset(); confirmReset = false }) { Text("Confirm reset") }; TextButton(onClick = { confirmReset = false }) { Text("Cancel") } }
+        }
+        Text("Switch counter",style=MaterialTheme.typography.titleMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ui.items.forEach { item -> FilterChip(selected = item.id == ui.item.id,onClick = { confirmReset = false; select(item.id) },label = { Text(item.name) }) }
         }
         Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = haptics,onCheckedChange = onHaptics); Text("Tap haptics") }
         Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = volume,onCheckedChange = onVolume); Text("Count with volume keys") }

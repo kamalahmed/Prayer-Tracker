@@ -108,7 +108,10 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Coroutin
 
 /** Alarm/system hooks: refresh widgets whenever a prayer alarm fires or the clock/zone changes. */
 @Singleton
-class WidgetAlarmHooks @Inject constructor(@ApplicationContext private val context: Context) : AlarmHooks {
+class WidgetAlarmHooks @Inject constructor(@ApplicationContext private val context: Context,private val settings: com.kamalahmed.prayerapp.data.settings.SettingsRepository) : AlarmHooks {
     override suspend fun onAlarm(type: AlarmType, prayer: Prayer) = WidgetUpdater.updateAll(context)
-    override suspend fun onSystemChange() = WidgetUpdater.refresh(context)
+    override suspend fun onSystemChange() {
+        guard("System hooks","widgets") { WidgetUpdater.refresh(context) }
+        guard("System hooks","summary schedule") { com.kamalahmed.prayerapp.summary.SummaryWorker.schedule(context,settings.current()) }
+    }
 }

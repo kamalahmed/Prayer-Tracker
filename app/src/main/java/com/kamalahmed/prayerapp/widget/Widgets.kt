@@ -150,7 +150,8 @@ class TasbihAction : ActionCallback {
             if (WidgetKinds.kindOf(context,id) != WidgetKind.TASBIH) return@guard
             val deps = widgetDeps(context)
             val item = deps.styles().get(id,WidgetKind.TASBIH).counterId
-            deps.nafl().adjustCounter(item, (parameters[Delta] ?: 1).coerceIn(-1,1))
+            val result=deps.nafl().adjustCounter(item, (parameters[Delta] ?: 1).coerceIn(-1,1))
+            if(result.after>result.before) com.kamalahmed.prayerapp.nafl.CounterFeedback.play(context,result.targetReached)
             WidgetUpdater.updateAll(context)
         }
     }

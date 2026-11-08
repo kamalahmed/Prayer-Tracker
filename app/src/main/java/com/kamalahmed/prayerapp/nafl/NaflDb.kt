@@ -42,7 +42,7 @@ interface NaflDao {
         val old = row.count.coerceIn(0, 1_000_000)
         val next = (old.toLong() + delta).coerceIn(0L, 1_000_000L).toInt()
         saveLog(row.copy(count = next))
-        return CounterResult(old, next, item.dailyTarget > 0 && old < item.dailyTarget && next >= item.dailyTarget)
+        return CounterResult(old, next, item.dailyTarget > 0 && next > old && next / item.dailyTarget > old / item.dailyTarget)
     }
     @Upsert suspend fun saveReminder(reminder: QuranReminder): Long
     @Query("DELETE FROM quran_reminder WHERE id = :id") suspend fun deleteReminder(id: Long)

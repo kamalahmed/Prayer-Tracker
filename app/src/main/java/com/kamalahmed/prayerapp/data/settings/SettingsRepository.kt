@@ -71,6 +71,10 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val dua = booleanPreferencesKey("adhan_dua")
         val vibrate = booleanPreferencesKey("vibrate")
         val onboarding = booleanPreferencesKey("onboarding_done")
+        val summaryDaily=booleanPreferencesKey("summary_daily")
+        val summaryDailyTime=intPreferencesKey("summary_daily_time")
+        val summaryWeekly=booleanPreferencesKey("summary_weekly")
+        val summaryWeeklyTime=intPreferencesKey("summary_weekly_time")
     }
 
     /** A read error (corrupt file, disk I/O) falls back to defaults instead of crashing every collector. */
@@ -100,6 +104,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         expected["sound_uri"] = ""
         Prayer.obligatory.forEach { expected["iq_fixed_${it.name}"] = 0 }
         source.asMap().forEach { (key,value) -> require(expected[key.name]?.javaClass == value.javaClass) { "Invalid settings type: ${key.name}" } }
+        listOf("summary_daily_time","summary_weekly_time").forEach { key -> source.asMap().entries.firstOrNull { it.key.name==key }?.let { require(it.value is Int && it.value as Int in 0..1439) { "Invalid summary time" } } }
         val s = source.toSettings()
         require(s.latitude.isFinite() && s.latitude in -90.0..90.0 && s.longitude.isFinite() && s.longitude in -180.0..180.0)
         java.time.ZoneId.of(s.timeZoneId)
@@ -163,6 +168,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             adhanDua = this[K.dua] ?: d.adhanDua,
             vibrate = this[K.vibrate] ?: d.vibrate,
             onboardingDone = this[K.onboarding] ?: d.onboardingDone,
+            summaryDaily=this[K.summaryDaily] ?: false, summaryDailyMinute=(this[K.summaryDailyTime] ?: d.summaryDailyMinute).coerceIn(0,1439),
+            summaryWeekly=this[K.summaryWeekly] ?: false, summaryWeeklyMinute=(this[K.summaryWeeklyTime] ?: d.summaryWeeklyMinute).coerceIn(0,1439),
         )
     }
 
@@ -211,5 +218,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         this[K.dua] = s.adhanDua
         this[K.vibrate] = s.vibrate
         this[K.onboarding] = s.onboardingDone
+        this[K.summaryDaily]=s.summaryDaily;this[K.summaryDailyTime]=s.summaryDailyMinute.coerceIn(0,1439)
+        this[K.summaryWeekly]=s.summaryWeekly;this[K.summaryWeeklyTime]=s.summaryWeeklyMinute.coerceIn(0,1439)
     }
 }

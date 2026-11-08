@@ -42,7 +42,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun NaflScreen(vm: NaflViewModel = hiltViewModel()) {
+fun NaflScreen(vm: NaflViewModel = hiltViewModel(), onSummaries: ()->Unit={}) {
     val state by vm.state.collectAsStateWithLifecycle()
     val failed by vm.loadFailed.collectAsStateWithLifecycle()
     val s = state
@@ -53,7 +53,7 @@ fun NaflScreen(vm: NaflViewModel = hiltViewModel()) {
         }
         return
     }
-    NaflContent(s, vm::log, vm::item, vm::add, vm::reminder, vm::removeReminder, vm::period, vm::shift, vm::day, vm::addTyped)
+    NaflContent(s, vm::log, vm::item, vm::add, vm::reminder, vm::removeReminder, vm::period, vm::shift, vm::day, vm::addTyped, onSummaries)
 }
 
 /** Stateless dashboard boundary so every editor and layout can be exercised without Hilt. */
@@ -69,7 +69,9 @@ fun NaflContent(
     onShift: (Long) -> Unit = {},
     onDay: (LocalDate) -> Unit = {},
     onAddTyped: (String,String,Int) -> Unit = { name, _, _ -> onAdd(name) },
+    onSummaries: ()->Unit={},
 ) {
+    var overview by rememberSaveable { mutableStateOf(false) }
     var editingLog by remember { mutableStateOf<NaflItem?>(null) }
     var customize by rememberSaveable { mutableStateOf(false) }
     var editItem by remember { mutableStateOf<NaflItem?>(null) }
@@ -113,9 +115,11 @@ fun NaflContent(
     }
     reminder?.let { r -> ReminderEditor(r, { reminder = null }) { saveReminder(it); reminder = null }; return }
     val done = NaflStats.rakaat(dayLogs.values.toList())
-    val monthStart = s.anchor.withDayOfMonth(1)
-    val monthQuran = s.logs.count { it.itemId == "quran" && it.count > 0 && it.date >= monthStart.toString() && it.date < monthStart.plusMonths(1).toString() && it.date <= s.today.toString() }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize()) {
+      NaflModeSwitch(overview,{overview=it})
+      if(overview) {
+          NaflOverview(s,onPeriod,onShift,{onDay(it);overview=false},onSummaries,Modifier.weight(1f))
+      } else Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Panel {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ProgressRing(done / 12f, 108.dp, AccentGreen, stroke = 12.dp) {
@@ -142,12 +146,6 @@ fun NaflContent(
             }
             if (s.day != s.today) TextButton(onClick = { onDay(s.today) }) { Text("Back to today") }
         }
-        KpiGrid(listOf(
-            { m -> KpiCard("Monthly Quran days", "$monthQuran days", monthStart.format(DateTimeFormatter.ofPattern("MMMM yyyy")), AccentGreen, m) },
-            { m -> KpiCard("Worship streak", "${s.report.streak} days", "any optional worship · current", Gold, m) },
-            { m -> KpiCard("Reading in period", "${s.report.pages} pages", "${s.report.minutes} minutes · optional totals", AccentGreen, m) },
-            { m -> KpiCard("Quran in period", "${s.report.quranDays} days", s.report.title, Gold, m) },
-        ))
         val blocks = listOf<@Composable () -> Unit>(
             { Panel("Daily Sunnah", "12 rakaat: 2 before Fajr, 4 + 2 Dhuhr, 2 after Maghrib, 2 after Isha") {
                 s.items.filter { it.group == "SUNNAH" && it.enabled }.forEach { item ->
@@ -162,16 +160,6 @@ fun NaflContent(
                     WorshipRow(item, log, { onLog(item, if ((log?.count ?: 0) > 0) 0 else 1, log?.pages ?: 0, log?.minutes ?: 0) }, { editingLog = item })
                 }
                 OutlinedButton(onClick = { customize = true }, modifier = Modifier.fillMaxWidth()) { Text("Customize worship") }
-            } },
-            { PeriodPanel(s, onPeriod, onShift) },
-            { ActivityCharts(s) },
-            { CounterCharts(s) },
-            { Panel("Per-item progress", "Selected period · completed days / tracked days. Streaks are current, not period-limited.") {
-                s.report.items.forEach { row ->
-                    Text(row.item.name + if (!row.item.enabled) " (hidden)" else "", fontWeight = FontWeight.SemiBold)
-                    Text("${row.count} logged · ${row.days} days · ${row.rate}% · ${row.streak}-day streak", style = MaterialTheme.typography.bodySmall)
-                    LinearProgressIndicator(progress = { row.rate / 100f }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp), color = AccentGreen)
-                }
             } },
             { Panel("Calendar", "Tap a past day to log. Intensity = completed worship items; blank = not tracked yet.") {
                 ContributionGrid(s.report.daily.map { it.date to it.completed }, s.today, AccentGreen, CardHigh, onDay,
@@ -205,8 +193,8 @@ fun NaflContent(
             }
         }
         Spacer(Modifier.height(24.dp))
+      }
     }
-
 }
 
 @Composable
@@ -226,36 +214,6 @@ private fun WorshipRow(item: NaflItem, log: NaflLog?, toggle: () -> Unit, edit: 
             }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         TextButton(onClick = edit, modifier = Modifier.semantics { contentDescription = "Edit ${item.name}" }) { Text("Edit") }
-    }
-}
-
-@Composable
-private fun PeriodPanel(s: NaflUi, onPeriod: (StatsPeriod) -> Unit, onShift: (Long) -> Unit) {
-    Panel("Your worship overview", "Counts are for the selected period; no obligation or missed-prayer debt is implied.") {
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            StatsPeriod.entries.forEachIndexed { i, p ->
-                SegmentedButton(selected = s.period == p, onClick = { onPeriod(p) }, shape = SegmentedButtonDefaults.itemShape(i, 3)) { Text(p.label) }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { onShift(-1) }, modifier = Modifier.semantics { contentDescription = "Previous Nafl period" }) { Text("‹") }
-            Text(s.report.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-            TextButton(onClick = { onShift(1) }, enabled = com.kamalahmed.prayerapp.tracker.Stats.range(s.period, s.anchor).second < s.today,
-                modifier = Modifier.semantics { contentDescription = "Next Nafl period" }) { Text("›") }
-        }
-    }
-}
-
-@Composable
-private fun ActivityCharts(s: NaflUi) {
-    Panel("Sunnah rakaat", if (s.period == StatsPeriod.YEAR) "Monthly totals from the 12 daily rakaat" else "Daily total out of the 12 daily rakaat") {
-        val slots = if (s.period == StatsPeriod.YEAR) s.report.daily.groupBy { it.date.month }.map { (m, days) ->
-            BarSlot(m.name.take(1), listOf(days.sumOf { it.rakaat } to AccentGreen), days.any { it.completed != null }, "${m.name}: ${days.sumOf { it.rakaat }} Sunnah rakaat")
-        } else s.report.daily.map { day ->
-            BarSlot(if (s.period == StatsPeriod.WEEK) day.date.dayOfWeek.name.take(2) else "${day.date.dayOfMonth}", listOf(day.rakaat to AccentGreen), day.completed != null, "${day.date}: ${day.rakaat} of 12 Sunnah rakaat")
-        }
-        StackedBarChart(slots, yMax = if (s.period == StatsPeriod.YEAR) null else 12)
-        if (s.report.daily.all { it.completed == null }) Text("Start logging to see your progress.", style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -344,28 +302,5 @@ private fun EditorPage(title: String, dismiss: () -> Unit, save: () -> Unit, val
             OutlinedButton(onClick = dismiss) { Text("Cancel") }
         }
         Spacer(Modifier.height(24.dp))
-    }
-}
-
-@Composable
-private fun CounterCharts(s: NaflUi) {
-    val counters = s.items.filter { it.isCounter }
-    if (counters.isEmpty()) return
-    var selected by rememberSaveable { mutableStateOf("istighfar") }
-    val item = counters.firstOrNull { it.id == selected } ?: counters.first()
-    val logs = s.logs.filter { it.itemId == item.id }.associateBy { it.date }
-    val days = s.report.daily.map { it.date to (logs[it.date.toString()]?.count ?: 0).coerceIn(0,1_000_000) }
-    Panel("Tasbih totals", "Daily counts · ${s.report.title}") {
-        Text("All counters in period: ${s.report.items.filter { it.item.isCounter }.sumOf { it.count.toLong() }}",fontWeight = FontWeight.Bold)
-        Text("Selected day: ${s.day} · ${logs[s.day.toString()]?.count ?: 0} ${item.name}")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            counters.forEach { c -> FilterChip(selected = c.id == item.id,onClick = { selected = c.id },label = { Text(c.name) }) }
-        }
-        Text("${item.name}: ${days.sumOf { it.second.toLong() }} in period",fontWeight = FontWeight.SemiBold)
-        val slots = if (s.period == StatsPeriod.YEAR) days.groupBy { it.first.month }.map { (month,rows) ->
-            val count = rows.sumOf { it.second }
-            BarSlot(month.name.take(1),listOf(count to AccentGreen),true,"${month.name}: $count ${item.name}")
-        } else days.map { (date,count) -> BarSlot(if (s.period == StatsPeriod.WEEK) date.dayOfWeek.name.take(2) else "${date.dayOfMonth}",listOf(count to AccentGreen),true,"$date: $count ${item.name}") }
-        StackedBarChart(slots)
     }
 }

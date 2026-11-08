@@ -60,6 +60,11 @@ data class AppSettings(
     val vibrate: Boolean = true,
     // App
     val onboardingDone: Boolean = false,
+    // Private reflections: opt in independently; local clock times, approximate Android delivery.
+    val summaryDaily: Boolean = false,
+    val summaryDailyMinute: Int = 21*60+30,
+    val summaryWeekly: Boolean = false,
+    val summaryWeeklyMinute: Int = 20*60,
 ) {
     fun adjustment(p: Prayer) = adjustments[p] ?: 0
     fun mode(p: Prayer) = notifyModes[p] ?: NotifyMode.OFF

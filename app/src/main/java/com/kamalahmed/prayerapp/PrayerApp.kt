@@ -55,6 +55,7 @@ class PrayerApp : Application(), Configuration.Provider {
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: android.app.Activity) {
                 appScope.launch { guard(TAG,"resume update check") { updateManager.checkAutomatic() } }
+                appScope.launch { guard(TAG,"resume summaries") { val s=settings.current();if(s.summaryDaily || s.summaryWeekly) com.kamalahmed.prayerapp.summary.SummaryWorker.checkOnResume(this@PrayerApp) } }
             }
             override fun onActivityCreated(a: android.app.Activity,b: android.os.Bundle?) = Unit
             override fun onActivityStarted(a: android.app.Activity) = Unit
@@ -65,7 +66,8 @@ class PrayerApp : Application(), Configuration.Provider {
         })
         // Any settings change (method, location, modes, reminders…) re-arms alarms and refreshes widgets.
         appScope.launch {
-            settings.settings.distinctUntilChanged().debounce(400).collect {
+            settings.settings.distinctUntilChanged().debounce(400).collect { s ->
+                guard(TAG,"summary schedule") { com.kamalahmed.prayerapp.summary.SummaryWorker.schedule(this@PrayerApp,s) }
                 // Each step guarded so one failure doesn't end the collector (no more re-arming for the session).
                 guard(TAG, "rescheduleAll") { scheduler.rescheduleAll() }
                 guard(TAG, "onSystemChange") { hooks.onSystemChange() }

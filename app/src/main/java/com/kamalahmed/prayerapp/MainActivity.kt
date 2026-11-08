@@ -33,6 +33,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(i: android.content.Intent?) {
+        com.kamalahmed.prayerapp.summary.SummaryNav.fromIntent(i)?.let { request ->
+            i?.removeExtra(com.kamalahmed.prayerapp.summary.SummaryNav.KIND);i?.removeExtra(com.kamalahmed.prayerapp.summary.SummaryNav.DATE)
+            com.kamalahmed.prayerapp.summary.SummaryNav.openRequested.value=request
+        }
         i?.getStringExtra(EXTRA_ACCEPT_UPDATE)?.let { tag ->
             i.removeExtra(EXTRA_ACCEPT_UPDATE)
             updater.acceptNotification(tag)

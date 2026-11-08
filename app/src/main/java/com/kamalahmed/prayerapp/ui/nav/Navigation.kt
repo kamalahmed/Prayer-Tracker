@@ -73,6 +73,7 @@ val availableSettings = SettingsDest.entries.toSet()
 object Routes {
     const val CALENDAR = "calendar"
     const val HOLIDAYS = "holidays"
+    const val SUMMARIES = "summaries"
 }
 
 @Composable
@@ -112,7 +113,7 @@ fun PrayerAppRoot() {
                     if (!spec.useRail) NavigationBar(containerColor = Card) {
                         TopDest.entries.forEach { d ->
                             NavigationBarItem(
-                                selected = current == d.route, onClick = { goTop(d) },
+                                selected = current == d.route || d==TopDest.STREAKS && current?.startsWith(Routes.SUMMARIES)==true, onClick = { goTop(d) },
                                 icon = { Icon(d.icon, contentDescription = null) }, label = { Text(d.label) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -130,7 +131,7 @@ fun PrayerAppRoot() {
                             Spacer(Modifier.weight(1f))
                             TopDest.entries.forEach { d ->
                                 NavigationRailItem(
-                                    selected = current == d.route, onClick = { goTop(d) },
+                                    selected = current == d.route || d==TopDest.STREAKS && current?.startsWith(Routes.SUMMARIES)==true, onClick = { goTop(d) },
                                     icon = { Icon(d.icon, contentDescription = null) }, label = { Text(d.label) },
                                     colors = NavigationRailItemDefaults.colors(
                                         selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -155,14 +156,32 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, back: () -> U
     LaunchedEffect(openUpdates) {
         if (openUpdates) { com.kamalahmed.prayerapp.update.UpdateNav.openRequested.value = false; nav.navigate(SettingsDest.APP.route) }
     }
+    val summaryRequest by com.kamalahmed.prayerapp.summary.SummaryNav.openRequested.collectAsStateWithLifecycle()
+    LaunchedEffect(summaryRequest) {
+        summaryRequest?.let { request ->
+            nav.navigate("${Routes.SUMMARIES}?kind=${request.kind.name}&date=${request.anchor}") { launchSingleTop=true }
+            com.kamalahmed.prayerapp.summary.SummaryNav.openRequested.value=null
+        }
+    }
     NavHost(nav, startDestination = TopDest.PRAYERS.route) {
         composable(TopDest.PRAYERS.route) {
             Column(Modifier.fillMaxSize()) {
                 com.kamalahmed.prayerapp.update.TodayUpdateBanner()
-                Box(Modifier.weight(1f)) { PrayersScreen(trackerContent = { TodayTracker() }) }
+                Box(Modifier.weight(1f)) { PrayersScreen(trackerContent = {
+                    Column { TodayTracker();androidx.compose.material3.TextButton(onClick={nav.navigate(Routes.SUMMARIES)}) { Text("Your day & week  →") } }
+                }) }
             }
         }
-        composable(TopDest.STREAKS.route) { StreaksScreen() }
+        composable(TopDest.STREAKS.route) { StreaksScreen(onSummaries={nav.navigate(Routes.SUMMARIES)}) }
+        composable(Routes.SUMMARIES+"?kind={kind}&date={date}",arguments=listOf(
+            androidx.navigation.navArgument("kind") { type=androidx.navigation.NavType.StringType;defaultValue="DAY" },
+            androidx.navigation.navArgument("date") { type=androidx.navigation.NavType.StringType;defaultValue="" },
+        )) { entry ->
+            val kind=com.kamalahmed.prayerapp.summary.SummaryKind.entries.firstOrNull { it.name==entry.arguments?.getString("kind") }
+            val date=runCatching { java.time.LocalDate.parse(entry.arguments?.getString("date")) }.getOrNull()
+            val initial=if(kind!=null && date!=null) com.kamalahmed.prayerapp.summary.SummaryRequest(kind,date) else null
+            MaxWidth { com.kamalahmed.prayerapp.summary.SummaryScreen(back,initial) }
+        }
         composable(TopDest.TIMES.route) {
             TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) })
         }

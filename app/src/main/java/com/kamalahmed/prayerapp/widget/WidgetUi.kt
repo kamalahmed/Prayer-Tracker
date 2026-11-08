@@ -523,26 +523,65 @@ private fun TasbihContent(ui: WidgetUiState) {
     val wide = WidgetLayout.wideCounter(size.width.value, size.height.value)
     var tap = if (ui.style.fillPanel) GlanceModifier.fillMaxSize() else GlanceModifier.fillMaxWidth()
     if (ui.interactive && item != null) tap = tap.clickable(actionRunCallback<TasbihAction>(actionParametersOf(TasbihAction.Delta to 1)))
-    val target = if ((item?.dailyTarget ?: 0) > 0) " / ${item!!.dailyTarget}" else ""
-    if (wide) {
-        Row(tap, verticalAlignment = Alignment.CenterVertically) {
-            Column(GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(item?.name ?: "Select a counter", style = ui.ts(14f, bold = true), maxLines = 1)
-                Text("Today · tap +1", style = ui.ts(9f, ui.pal.sub), maxLines = 1)
+    val progress=com.kamalahmed.prayerapp.nafl.CounterProgress.of(count,item?.dailyTarget ?: 0)
+    val target=if(progress.hasTarget) "Target ${progress.target}" else "Free count"
+    val lap=if(progress.laps>0) "×${progress.laps}" else "tap +1"
+    // At the resize minimum, preserve a readable number rather than shrinking every label to 2sp.
+    if(wide && (size.width.value<180f || size.height.value<64f)) {
+        val width=(size.width.value-2*(ui.style.outerMargin+ui.style.padH)).coerceAtLeast(60f)
+        val height=(size.height.value-2*(ui.style.outerMargin+ui.style.padV)).coerceAtLeast(22f)
+        val diameter=minOf(20f,height)
+        val countWidth=(width-diameter-24f).coerceAtLeast(30f)
+        val font=minOf(22f*ui.style.textScale*ui.style.contentScale,countWidth/(count.toString().length*0.58f)).coerceAtLeast(8f)
+        val ctx=LocalContext.current
+        val smallBitmap=com.kamalahmed.prayerapp.core.safety.guard("CounterWidget","compact ring") { com.kamalahmed.prayerapp.nafl.CounterRingPainter.bitmap(diameter,ctx.resources.displayMetrics.density,progress,WidgetPalette.withAlpha(ui.pal.text,0.14f),ui.pal.accent,ui.pal.gold) }
+        Row(tap,verticalAlignment=Alignment.CenterVertically) {
+            if(smallBitmap!=null) Image(ImageProvider(smallBitmap),contentDescription="${item?.name ?: "Counter"}: $count, $target, $lap",modifier=GlanceModifier.size(diameter.dp),contentScale=ContentScale.Fit)
+            Column(GlanceModifier.defaultWeight().padding(horizontal=2.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+                Text("$count",style=ui.ts(12f,ui.pal.accent,true).copy(fontSize=font.sp),maxLines=1)
+                Text(item?.name ?: "Counter",style=ui.ts(8f,ui.pal.sub).copy(fontSize=7.sp),maxLines=1)
             }
-            val countText = "$count$target"
-            Text(countText, GlanceModifier.defaultWeight(), style = ui.ts(minOf(25f, 145f / countText.length), ui.pal.accent, true).copy(textAlign = TextAlign.Center), maxLines = 1)
-            CounterActions(ui, item != null, wide = true)
+            var open=GlanceModifier.width(20.dp).height(height.dp)
+            if(ui.interactive) open=open.clickable(actionStartActivity<com.kamalahmed.prayerapp.ui.nafl.TasbihActivity>(actionParametersOf(ActionParameters.Key<String>("counterId") to ui.style.counterId)))
+            Box(open,contentAlignment=Alignment.Center) { Text("Open",style=ui.ts(8f).copy(fontSize=8.sp),maxLines=1) }
+        }
+        return
+    }
+    val ringDp=ui.box(if(wide) 50 else 90)
+    val context=LocalContext.current
+    val bitmap=com.kamalahmed.prayerapp.core.safety.guard("CounterWidget","ring bitmap") {
+        com.kamalahmed.prayerapp.nafl.CounterRingPainter.bitmap(ringDp.value,context.resources.displayMetrics.density,progress,
+            WidgetPalette.withAlpha(ui.pal.text,0.14f),ui.pal.accent,ui.pal.gold)
+    }
+    @Composable fun Ring() {
+        Box(GlanceModifier.size(ringDp),contentAlignment=Alignment.Center) {
+            if(bitmap!=null) Image(ImageProvider(bitmap),contentDescription=null,modifier=GlanceModifier.fillMaxSize(),contentScale=ContentScale.Fit)
+            Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                val base=if(wide) 23f else 32f
+                val fit=(if(wide) 54f else 105f)/count.toString().length.coerceAtLeast(1)/ui.style.textScale
+                Text("$count",style=ui.ts(minOf(base,fit),ui.pal.accent,true),maxLines=1)
+                if(!wide) {
+                    Text(target,style=ui.ts(8f,ui.pal.sub),maxLines=1)
+                    Text(lap,style=ui.ts(9f,ui.pal.accent,true),maxLines=1)
+                }
+            }
+        }
+    }
+    if(wide) {
+        Row(tap,verticalAlignment=Alignment.CenterVertically) {
+            Ring()
+            Column(GlanceModifier.defaultWeight().padding(horizontal=ui.box(5)),horizontalAlignment=Alignment.CenterHorizontally) {
+                Text(item?.name ?: "Select a counter",style=ui.ts(14f,bold=true),maxLines=1)
+                Text("$target · $lap",style=ui.ts(10f,ui.pal.sub),maxLines=1)
+                Text("Today · tap +1",style=ui.ts(8f,ui.pal.sub),maxLines=1)
+            }
+            CounterActions(ui,item!=null,wide=true)
         }
     } else {
-        Column(tap, horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
-            Text(item?.name ?: "Select a counter", style = ui.ts(15f, bold = true), maxLines = 1)
-            Text("Today · tap +1", style = ui.ts(9f, ui.pal.sub), maxLines = 1)
-            Text("$count", style = ui.ts(38f, ui.pal.accent, true), maxLines = 1)
-            Text(if (target.isNotEmpty()) "Target ${item!!.dailyTarget}" else "No target", style = ui.ts(10f, ui.pal.sub), maxLines = 1)
-            Row(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
-                CounterActions(ui, item != null, wide = false)
-            }
+        Column(tap,horizontalAlignment=Alignment.CenterHorizontally,verticalAlignment=Alignment.CenterVertically) {
+            Text(item?.name ?: "Select a counter",style=ui.ts(15f,bold=true),maxLines=1)
+            Ring()
+            Row(GlanceModifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally,verticalAlignment=Alignment.CenterVertically) { CounterActions(ui,item!=null,wide=false) }
         }
     }
 }

@@ -72,11 +72,14 @@ import java.util.Locale
 
 /** Streaks tab: "Stats" (tracker dashboard) and "Qada" (make-up prayers) sub-tabs, keeping 5 nav destinations. */
 @Composable
-fun StreaksScreen(vm: StreaksViewModel = hiltViewModel()) {
+fun StreaksScreen(vm: StreaksViewModel = hiltViewModel(), onSummaries: ()->Unit={}) {
     var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
-            Text(when (tab) { 0 -> "Streaks"; 1 -> "Qada"; else -> "Nafl" }, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Text(when (tab) { 0 -> "Streaks"; 1 -> "Qada"; else -> "Nafl" },Modifier.weight(1f),fontSize=30.sp,fontWeight=FontWeight.Bold)
+                TextButton(onClick=onSummaries) { Text("Your summaries") }
+            }
             androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 listOf("Stats", "Qada", "Nafl").forEachIndexed { i, l ->
                     SegmentedButton(
@@ -89,7 +92,7 @@ fun StreaksScreen(vm: StreaksViewModel = hiltViewModel()) {
         when (tab) {
             0 -> StatsContent(vm)
             1 -> com.kamalahmed.prayerapp.ui.qada.QadaScreen()
-            else -> com.kamalahmed.prayerapp.ui.nafl.NaflScreen()
+            else -> com.kamalahmed.prayerapp.ui.nafl.NaflScreen(onSummaries=onSummaries)
         }
     }
 }

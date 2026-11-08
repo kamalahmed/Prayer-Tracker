@@ -20,6 +20,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 enum class RestoreMode { REPLACE, MERGE }
+data class SnapshotReceipt(val file: File,val localAt: Long,val folderAt: Long=0,val folderUri: String?=null,val folderError: String?=null) {
+    val locations get()=if(folderUri!=null) 2 else 1
+}
+data class BackupStatus(val localAt: Long=0,val localName: String?=null,val folderAt: Long=0,val folderUri: String?=null,val folderError: String?=null)
+
 
 object BackupUserPrefs {
     suspend fun capture(ctx: Context): JSONObject {
@@ -52,6 +57,31 @@ class BackupRepository @Inject constructor(
     private val styles: WidgetStyleStore,
     private val updates: UpdatePrefs,
 ) {
+    fun status(): BackupStatus {
+        val legacy=if(meta.getLong("last_local",0)==0L) snapshots().firstOrNull() else null
+        return BackupStatus(meta.getLong("last_local",legacy?.lastModified() ?: 0),meta.getString("local_name",legacy?.name),
+            meta.getLong("last_folder",0),meta.getString("folder_document",null),meta.getString("folder_error",null))
+    }
+    suspend fun snapshotWithReceipt(day: LocalDate=LocalDate.now()): SnapshotReceipt=withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val text=exportUnlocked()
+            val file=BackupSnapshots.write(ctx,"daily-${day.format(DateTimeFormatter.BASIC_ISO_DATE)}.json",text)
+            val localAt=status().localAt
+            val destination=folder
+            if(destination==null) { check(meta.edit().remove("last_error").commit()); return@withLock SnapshotReceipt(file,localAt) }
+            try {
+                val document=BackupSnapshots.exportToFolder(ctx,Uri.parse(destination),"prayer-backup-${day.format(DateTimeFormatter.BASIC_ISO_DATE)}-${System.currentTimeMillis()}.json",text)
+                val at=System.currentTimeMillis()
+                check(meta.edit().putLong("last_folder",at).putString("folder_document",document.toString()).remove("folder_error").remove("last_error").commit()) { "Copy saved, but its receipt could not be recorded" }
+                SnapshotReceipt(file,localAt,at,document.toString())
+            } catch(e: Exception) {
+                com.kamalahmed.prayerapp.core.safety.CrashLog.nonFatal("Backup","Folder copy failed; local snapshot is safe",e)
+                val message=e.message?.take(180) ?: "Folder unavailable. Choose the folder again."
+                check(meta.edit().putString("folder_error",message).commit())
+                SnapshotReceipt(file,localAt,folderError=message)
+            }
+        }
+    }
     private val mutex=Mutex()
     private val meta get()=ctx.getSharedPreferences("backup_metadata",Context.MODE_PRIVATE)
     val lastBackup: Long get()=meta.getLong("last_backup",0)
@@ -62,7 +92,9 @@ class BackupRepository @Inject constructor(
             require(uri.scheme=="content" && android.provider.DocumentsContract.isTreeUri(uri)) { "Choose a document folder" }
             ctx.contentResolver.takePersistableUriPermission(uri,android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         }
-        check(meta.edit().putString("auto_folder",uri?.toString()).commit())
+        val edit=meta.edit().putString("auto_folder",uri?.toString())
+        if(folder!=uri?.toString()) edit.remove("last_folder").remove("folder_document").remove("folder_error")
+        check(edit.commit())
     }
     private suspend fun exportUnlocked(): String = db.withTransaction { BackupCodec.capture(db.openHelper.writableDatabase,4,BackupUserPrefs.capture(ctx)) }
     suspend fun exportJson(): String=withContext(Dispatchers.IO) { mutex.withLock { exportUnlocked() } }
@@ -145,7 +177,6 @@ class BackupRepository @Inject constructor(
                 throw e
             }
             db.invalidationTracker.refreshVersionsAsync()
-            markExported()
         }
     }
     private fun mergeExisting(table: String,row: JSONObject): Boolean {
@@ -173,13 +204,10 @@ class BackupRepository @Inject constructor(
         if(withContext(Dispatchers.IO) { snapshots().none { it.name==name } }) dailySnapshot()
     }
     fun snapshots(): List<File> = BackupSnapshots.list(ctx)
-    suspend fun dailySnapshot(day: LocalDate=LocalDate.now()): File=withContext(Dispatchers.IO) {
-        mutex.withLock {
-            val text=exportUnlocked()
-            val file=BackupSnapshots.write(ctx,"daily-${day.format(DateTimeFormatter.BASIC_ISO_DATE)}.json",text)
-            markExported()
-            folder?.let { BackupSnapshots.exportToFolder(ctx,Uri.parse(it),"prayer-backup-${day.format(DateTimeFormatter.BASIC_ISO_DATE)}-${System.currentTimeMillis()}.json",text) }
-            file
-        }
+    /** Existing worker API: retry a failed folder copy while preserving the successful phone snapshot. */
+    suspend fun dailySnapshot(day: LocalDate=LocalDate.now()): File {
+        val receipt=snapshotWithReceipt(day)
+        receipt.folderError?.let { throw java.io.IOException("Phone snapshot saved; folder copy failed: $it") }
+        return receipt.file
     }
 }

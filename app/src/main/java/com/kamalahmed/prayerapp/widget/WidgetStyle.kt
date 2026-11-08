@@ -239,7 +239,7 @@ object WidgetLayout {
             WidgetKind.LARGE -> 280f to (if (both) 400f else 310f)
             WidgetKind.IQAMAH_TABLE -> 280f to 235f
             WidgetKind.MINIMAL -> 260f to (if (both) 65f else 42f)
-            WidgetKind.TASBIH -> if (wideCounter(widthDp, heightDp)) 245f to 50f else 135f to 130f
+            WidgetKind.TASBIH -> if (wideCounter(widthDp, heightDp)) 245f to 50f else 135f to 150f
         }
         val s = style.sanitized()
         val availW = (widthDp - 2 * (s.outerMargin + s.padH)).coerceAtLeast(1f)
