@@ -11,6 +11,8 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.provideContent
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.kamalahmed.prayerapp.core.model.Prayer
 import com.kamalahmed.prayerapp.core.safety.launchAsync
 import java.time.LocalDate
@@ -25,11 +27,23 @@ abstract class PrayerWidget(val kind: WidgetKind) : GlanceAppWidget() {
         // The layout kind comes from the instance's real provider (receiver), not from this object, so an
         // update routed through the wrong GlanceAppWidget can never render another widget's layout.
         val kind = WidgetKinds.kindOf(context, appWidgetId) ?: kind
+        val initial = loadSnapshot(deps, appWidgetId, kind)
+        // Root cause of "widget not live" (beta.6): data used to be loaded once, outside provideContent. While a
+        // Glance session is alive (it stays up after every tap), update() only recomposes the running session and
+        // never re-runs provideGlance, so the widget kept rendering the stale snapshot. Now the content observes the
+        // tracker DB, settings and an explicit refresh signal, so every change re-renders with fresh data.
+        val live = WidgetLive.snapshots(deps, appWidgetId, kind) { loadSnapshot(deps, appWidgetId, kind) }
+        provideContent {
+            val snap by live.collectAsState(initial)
+            WidgetContent(kind, snap.style, snap.data)
+        }
+    }
+
+    private suspend fun loadSnapshot(deps: WidgetEntryPoint, appWidgetId: Int, kind: WidgetKind): WidgetSnapshot {
         // A corrupt style entry must not leave the widget blank: fall back to the kind's default look.
         val style = com.kamalahmed.prayerapp.core.safety.guard("PrayerWidget", "style #$appWidgetId") { deps.styles().get(appWidgetId, kind) }
             ?: WidgetStyle.decode(null, kind)
-        val data = deps.loadWidgetData()
-        provideContent { WidgetContent(kind, style, data) }
+        return WidgetSnapshot(style, deps.loadWidgetData())
     }
 }
 
@@ -102,7 +116,9 @@ class ToggleAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val prayer = Prayer.entries.firstOrNull { it.name == parameters[KeyPrayer] } ?: return
         val date = parameters[KeyDate]?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return
-        widgetDeps(context).tracker().togglePrayed(date, prayer)
+        // The DB write is observed by every running widget session (instant feedback); updateAll also covers
+        // widgets whose session has ended.
+        com.kamalahmed.prayerapp.core.safety.guard("ToggleAction", "toggle") { widgetDeps(context).tracker().togglePrayed(date, prayer) }
         WidgetUpdater.updateAll(context)
     }
 

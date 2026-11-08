@@ -37,6 +37,7 @@ object WidgetUpdater {
     private const val REQ = 9_001
 
     suspend fun updateAll(context: Context) {
+        WidgetLive.bump() // running sessions reload their data
         if (!WidgetKinds.anyPlaced(context)) return
         // Update each placed instance through its own receiver's widget, by appWidgetId. GlanceAppWidget.updateAll()
         // looks instances up by the GlanceAppWidget class name, which broke when R8 merged the six widget classes
