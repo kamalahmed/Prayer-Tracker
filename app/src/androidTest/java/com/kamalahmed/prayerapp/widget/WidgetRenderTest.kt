@@ -65,6 +65,7 @@ class WidgetRenderTest {
     private val sizes = mapOf(
         WidgetKind.NEXT_SMALL to (170 to 170), WidgetKind.ALL_WIDE to (320 to 110), WidgetKind.NEXT_STREAK to (290 to 165),
         WidgetKind.TRACKER to (320 to 120), WidgetKind.LARGE to (320 to 360), WidgetKind.MINIMAL to (300 to 64),
+        WidgetKind.TASBIH to (170 to 170), WidgetKind.IQAMAH_TABLE to (320 to 300),
     )
 
     @Test fun opacityZeroHasNoBackgroundAndHundredIsOpaque() {
@@ -84,7 +85,7 @@ class WidgetRenderTest {
             val (w, _) = sizes.getValue(k)
             val tall = 520
             for (a in WidgetAlign.entries) {
-                val st = WidgetStyle.defaults(k).copy(theme = WidgetTheme.SOLID, opacity = 100, corner = 0, padV = 0, padH = 0, spacing = 0, align = a)
+                val st = WidgetStyle.defaults(k).copy(fillPanel = false, theme = WidgetTheme.SOLID, opacity = 100, corner = 0, padV = 0, padH = 0, spacing = 0, align = a)
                 val b = render(k, st, w, tall, "${k}_tall_${a}_pad0")
                 val rows = (0 until b.height).filter { y -> (b.getPixel(b.width / 2, y) ushr 24) != 0 }
                 assertTrue("$k drew something", rows.isNotEmpty())
@@ -97,7 +98,7 @@ class WidgetRenderTest {
                 }
             }
             // Max padding makes the panel taller than zero padding by ~2*32dp.
-            val st0 = WidgetStyle.defaults(k).copy(theme = WidgetTheme.SOLID, opacity = 100, corner = 0, padV = 0, padH = 0, align = WidgetAlign.TOP)
+            val st0 = WidgetStyle.defaults(k).copy(fillPanel = false, theme = WidgetTheme.SOLID, opacity = 100, corner = 0, padV = 0, padH = 0, align = WidgetAlign.TOP)
             val h0 = alphaRows(render(k, st0, w, tall, "${k}_tall_padV0"))
             val h32 = alphaRows(render(k, st0.copy(padV = 32, padH = 32), w, tall, "${k}_tall_padV32"))
             if (k != WidgetKind.LARGE) assertTrue("$k padV grows panel: $h0 -> $h32", h32 - h0 >= px(60))

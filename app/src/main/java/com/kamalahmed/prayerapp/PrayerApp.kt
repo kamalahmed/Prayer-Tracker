@@ -33,6 +33,7 @@ class PrayerApp : Application(), Configuration.Provider {
 
     @Inject lateinit var nafl: com.kamalahmed.prayerapp.nafl.NaflRepository
     @Inject lateinit var quranReminders: com.kamalahmed.prayerapp.nafl.QuranReminders
+    @Inject lateinit var backups: com.kamalahmed.prayerapp.backup.BackupRepository
 
     val appScope = com.kamalahmed.prayerapp.core.safety.safeScope("PrayerApp")
 
@@ -47,6 +48,8 @@ class PrayerApp : Application(), Configuration.Provider {
         guard(TAG, "channels") { Channels.create(this) }
         guard(TAG, "update channel") { com.kamalahmed.prayerapp.update.UpdateWorker.createChannel(this) }
         guard(TAG, "update worker") { com.kamalahmed.prayerapp.update.UpdateWorker.schedule(this, updatePrefs.autoCheck.value, updatePrefs.wifiOnly.value) }
+        appScope.launch { guard(TAG, "startup backup") { backups.ensureTodaySnapshot() } }
+        guard(TAG, "daily backup") { com.kamalahmed.prayerapp.backup.LocalBackupWorker.schedule(this) }
         guard(TAG, "reschedule worker") { RescheduleWorker.enqueue(this) }
         appScope.launch { guard(TAG, "Quran reminders") { quranReminders.reschedule() } }
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {

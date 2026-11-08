@@ -92,6 +92,29 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         }
     }
 
+    suspend fun backupExport() = com.kamalahmed.prayerapp.backup.PreferenceJson.encode(context.settingsStore.data.first())
+
+    fun validateBackup(obj: org.json.JSONObject) {
+        val source = com.kamalahmed.prayerapp.backup.PreferenceJson.decode(obj)
+        val expected = androidx.datastore.preferences.core.mutablePreferencesOf().apply { write(AppSettings()) }.asMap().mapKeys { it.key.name }.toMutableMap()
+        expected["sound_uri"] = ""
+        Prayer.obligatory.forEach { expected["iq_fixed_${it.name}"] = 0 }
+        source.asMap().forEach { (key,value) -> require(expected[key.name]?.javaClass == value.javaClass) { "Invalid settings type: ${key.name}" } }
+        val s = source.toSettings()
+        require(s.latitude.isFinite() && s.latitude in -90.0..90.0 && s.longitude.isFinite() && s.longitude in -180.0..180.0)
+        java.time.ZoneId.of(s.timeZoneId)
+        if(s.soundSource == SoundSource.RINGTONE && s.soundUri != null) require(android.net.Uri.parse(s.soundUri).scheme in setOf("content","android.resource"))
+        if(s.soundSource == SoundSource.CUSTOM_FILE && s.soundUri != null) require(s.soundUri.substringAfterLast('/').matches(Regex("custom\\.[A-Za-z0-9]{1,5}")))
+        require(s.volumePercent in 0..100 && s.hijriAdjust in -3..3 && s.maxPlaySeconds in 1..3600 && s.preReminderMinutes in 0..180 && s.snoozeMinutes in 1..180)
+        require(s.adjustments.values.all { it in -180..180 } && s.iqamaMinutes.values.all { it in 0..180 })
+    }
+
+    suspend fun backupRestore(obj: org.json.JSONObject, merge: Boolean) {
+        validateBackup(obj)
+        val source = com.kamalahmed.prayerapp.backup.PreferenceJson.decode(obj)
+        context.settingsStore.edit { com.kamalahmed.prayerapp.backup.PreferenceJson.apply(it, source, merge) }
+    }
+
     private inline fun <reified E : Enum<E>> String?.toEnum(default: E): E =
         this?.let { v -> enumValues<E>().firstOrNull { it.name == v } } ?: default
 

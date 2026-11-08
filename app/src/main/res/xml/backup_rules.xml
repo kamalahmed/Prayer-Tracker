@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <exclude domain="file" path="diagnostics/" />
-    <exclude domain="file" path="sounds/" />
-    <exclude domain="sharedpref" path="updater.xml" />
+    <include domain="database" path="tracker.db" />
+    <include domain="database" path="tracker.db-wal" />
+    <include domain="file" path="datastore/" />
+    <include domain="file" path="backups/" />
+    <include domain="file" path="sounds/" />
+    <include domain="sharedpref" path="tasbih.xml" />
+    <include domain="sharedpref" path="backup_metadata.xml" />
 </full-backup-content>

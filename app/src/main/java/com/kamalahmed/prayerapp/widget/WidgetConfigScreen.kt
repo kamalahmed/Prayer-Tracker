@@ -66,7 +66,7 @@ fun previewSize(kind: WidgetKind): DpSize = when (kind) {
     WidgetKind.NEXT_STREAK -> DpSize(290.dp, 165.dp)
     WidgetKind.TRACKER -> DpSize(320.dp, 140.dp)
     WidgetKind.LARGE -> DpSize(320.dp, 330.dp)
-    WidgetKind.TASBIH -> DpSize(230.dp, 220.dp)
+    WidgetKind.TASBIH -> DpSize(170.dp, 170.dp)
     WidgetKind.IQAMAH_TABLE -> DpSize(320.dp, 300.dp)
     WidgetKind.MINIMAL -> DpSize(300.dp, 64.dp)
 }
@@ -74,13 +74,17 @@ fun previewSize(kind: WidgetKind): DpSize = when (kind) {
 /** Renders the real Glance widget composition to RemoteViews and shows it — a true live preview. */
 @OptIn(ExperimentalGlanceRemoteViewsApi::class)
 @Composable
-fun WidgetPreview(kind: WidgetKind, style: WidgetStyle, data: WidgetData, modifier: Modifier = Modifier) {
+fun WidgetPreview(kind: WidgetKind, style: WidgetStyle, data: WidgetData, modifier: Modifier = Modifier, sizeOverride: DpSize? = null) {
     val ctx = LocalContext.current
-    val size = previewSize(kind)
+    val size = sizeOverride ?: previewSize(kind)
     var rv by remember { mutableStateOf<RemoteViews?>(null) }
-    LaunchedEffect(kind, style, data) {
+    LaunchedEffect(kind, style, data, size) {
         rv = runCatching {
-            GlanceRemoteViews().compose(ctx, size) { WidgetContent(kind, style, data, interactive = false) }.remoteViews
+            val previewData = if (kind == WidgetKind.TASBIH && data.counterItems.isEmpty()) data.copy(
+                counterItems = com.kamalahmed.prayerapp.nafl.NaflDefaults.items,
+                counterLogs = listOf(com.kamalahmed.prayerapp.nafl.NaflLog(data.now.withZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDate().toString(), style.counterId, 33)),
+            ) else data
+            GlanceRemoteViews().compose(ctx, size) { WidgetContent(kind, style, previewData, interactive = false) }.remoteViews
         }.getOrNull()
     }
     AndroidView(
@@ -102,6 +106,8 @@ fun WidgetConfigScreen(
     onClose: () -> Unit,
 ) {
     var lightWallpaper by remember { mutableStateOf(false) }
+    var previewW by remember(kind) { mutableStateOf(previewSize(kind).width.value) }
+    var previewH by remember(kind) { mutableStateOf(previewSize(kind).height.value) }
     fun set(f: WidgetStyle.() -> WidgetStyle) = onChange(style.f().sanitized())
 
     Scaffold(
@@ -126,11 +132,11 @@ fun WidgetConfigScreen(
             // Live preview on a fake wallpaper so transparency is visible.
             val wall = if (lightWallpaper) listOf(Color(0xFFE9D8B8), Color(0xFF9CC5E8)) else listOf(Color(0xFF1B3B2F), Color(0xFF3A2A4F))
             Box(
-                Modifier.fillMaxWidth().height(previewSize(kind).height + 40.dp)
+                Modifier.fillMaxWidth().height(previewH.dp + 32.dp)
                     .background(Brush.linearGradient(wall)).clickable { lightWallpaper = !lightWallpaper },
                 contentAlignment = Alignment.Center,
             ) {
-                WidgetPreview(kind, style, data)
+                WidgetPreview(kind, style, data, sizeOverride = DpSize(previewW.dp, previewH.dp))
                 Text(
                     "Tap to switch wallpaper", color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp),
@@ -183,6 +189,27 @@ fun WidgetConfigScreen(
                     SliderRow("Opacity", style.opacity.toFloat(), 0f..100f, "${style.opacity}%") { set { copy(opacity = it.roundToInt()) } }
                 }
 
+                SectionHeader("Coverage & size")
+                CardGroup {
+                    SwitchRow("Fill the entire cell", style.fillPanel, subtitle = "Off: wrap content; the launcher still reserves its grid cells") { v -> set { copy(fillPanel = v) } }
+                    SliderRow("Overall content scale", style.contentScale, 0.6f..1.5f, pct(style.contentScale)) { set { copy(contentScale = step(it)) } }
+                    SliderRow("Outer margin", style.outerMargin.toFloat(), 0f..24f, "${style.outerMargin} dp") { set { copy(outerMargin = it.roundToInt()) } }
+                    Text("Use the launcher's handles to resize the actual widget. Preview dimensions simulate that allocation.", Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
+                    SliderRow("Preview width", previewW, 120f..360f, "${previewW.roundToInt()} dp") { previewW = it.roundToInt().toFloat() }
+                    SliderRow("Preview height", previewH, 60f..360f, "${previewH.roundToInt()} dp") { previewH = it.roundToInt().toFloat() }
+                    if (kind == WidgetKind.TASBIH) Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = !WidgetLayout.wideCounter(previewW, previewH), onClick = { previewW = 170f; previewH = 170f }, label = { Text("Square") })
+                        FilterChip(selected = WidgetLayout.wideCounter(previewW, previewH), onClick = { previewW = 320f; previewH = 80f }, label = { Text("Wide") })
+                    }
+                }
+                if (kind == WidgetKind.TRACKER || kind == WidgetKind.NEXT_STREAK) {
+                    SectionHeader("Prayer times around ticks")
+                    CardGroup {
+                        FlowRow(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TickTimes.entries.forEach { pos -> FilterChip(selected = style.tickTimes == pos, onClick = { set { copy(tickTimes = pos) } }, label = { Text(pos.label) }) }
+                        }
+                    }
+                }
                 SectionHeader("Layout")
                 CardGroup {
                     SliderRow("Corner radius", style.corner.toFloat(), 0f..40f, "${style.corner} dp") { set { copy(corner = it.roundToInt()) } }

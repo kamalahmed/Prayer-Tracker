@@ -91,7 +91,7 @@ class Phase16Test {
         val row = data.rows.first { it.prayer == Prayer.DHUHR }
         assertEquals(ui.time(ui.next.time),ui.rowTime(row)); assertTrue(ui.isNext(row)); assertFalse(ui.passed(row)); assertTrue(ui.progress in 0f..1f)
         val both = WidgetUiState(WidgetStyle(timeMode = WidgetTimeMode.BOTH),data,false)
-        assertTrue(both.rowTime(row).startsWith("A ")); assertTrue(both.rowTime(row).contains("\nI "))
+        assertTrue(both.rowTime(row).startsWith(both.time(row.time))); assertTrue(both.rowTime(row).contains("\nIqamah "))
     }
     @Test fun fridayOverrideSupportsOffsetModeToo() {
         val adhan = ZonedDateTime.of(2026,11,6,12,10,0,0,ZoneId.of("Asia/Dubai"))

@@ -222,6 +222,7 @@ private fun SettingsDetail(d: SettingsDest, onBack: () -> Unit, open: (SettingsD
                 val vm: com.kamalahmed.prayerapp.ui.settings.SettingsViewModel = hiltViewModel()
                 com.kamalahmed.prayerapp.ui.settings.AppScreen(vm, onBack = onBack, onOnboarding = { vm.update { it.copy(onboardingDone = false) } }, updateVm = hiltViewModel())
             }
+            SettingsDest.BACKUP -> com.kamalahmed.prayerapp.backup.BackupScreen(hiltViewModel(), onBack = onBack)
             SettingsDest.WIDGETS -> com.kamalahmed.prayerapp.ui.widgets.WidgetStudioScreen(onBack = onBack)
         }
     }

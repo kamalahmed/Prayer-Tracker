@@ -41,6 +41,7 @@ enum class SettingsDest(val route: String) {
     TIME("settings/time"),
     IQAMA("settings/iqama"),
     APP("settings/app"),
+    BACKUP("settings/backup"),
     WIDGETS("settings/widgets"),
 }
 
@@ -89,6 +90,8 @@ fun SettingsContent(
                     }
                 }
             }
+            RowDivider()
+            ListRow("Backup & restore", subtitle = "Export, import and automatic snapshots", onClick = go(SettingsDest.BACKUP), selected = selected == SettingsDest.BACKUP)
             RowDivider()
             ListRow("App", subtitle = "About, updates, onboarding, reset", onClick = go(SettingsDest.APP), selected = selected == SettingsDest.APP)
         }

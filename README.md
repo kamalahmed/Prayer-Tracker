@@ -15,12 +15,17 @@ Defaults: Sharjah, UAE, using the Authority of Dubai calculation method.
 - **Tablets and foldables:** a navigation rail on wide screens, two-pane Prayers, Times and Qibla, a multi-column Streaks dashboard and Settings list-detail. Fold, unfold and rotation keep your state.
 - **Tasbih counter** — Nafl items can be checkboxes or counters with optional daily targets. Presets include Istighfar, Durud/Salawat, SubhanAllah, Alhamdulillah, Allahu Akbar and La ilaha illallah; create/rename custom counters in Customize worship. Tap Count to open the full-screen counter: large tap surface, optional volume-key counting, haptics, target vibration, −1 and a confirmed session reset that preserves earlier/widget counts. Daily totals persist; view day totals plus week/month/year totals and charts in Nafl. Quran reminder controls and displays always use 12-hour AM/PM.
 - **Iqamah** — Settings › Iqamah: choose offset minutes or fixed clock times per prayer and an optional Friday Jumu'ah override. Independently enable each notification and its lead time (0 = at iqamah); all are off by default and do not depend on adhan sound modes. Boot/app-update/time changes re-arm them. Fixed-before-adhan times are skipped except Isha, which can roll to the next day.
-- Eight home-screen widgets: Next, Wide, Streak, Tracker, Large, Minimal, **Tasbih** and **Adhan + Iqamah**. Tasbih instances each select a counter and increment/decrement directly, without opening the app. Prayer widgets can show Start, Iqamah or Both; the new larger table always shows both columns. Each widget has its own style settings for theme, transparency (0 % = no background at all), vertical padding, horizontal padding, spacing between items, position in the cell (top/center/bottom), text/icon/box size and accent. The background panel wraps the content, so a tall cell no longer shows an empty tinted area. Row widgets can be 1 cell tall. "Always show full layout" keeps every prayer visible at small sizes. The countdown ticks live, and Widget Studio shows a live preview.
+- Eight home-screen widgets: Next, Wide, Streak, Tracker, Large, Minimal, **Tasbih** and **Adhan + Iqamah**. Tasbih instances each select a counter and increment/decrement directly, without opening the app. Prayer widgets can show Start, Iqamah or Both; the new larger table always shows both columns. Each widget has its own style settings for theme, transparency (0 % = no background at all), vertical padding, horizontal padding, spacing between items, position in the cell (top/center/bottom), text/icon/box size and accent. The background panel fills its allocation by default; per-instance fill/wrap, overall scale, outer margin and inner padding control coverage. Tasbih selects a square or wide layout from size and has a true counter preview. Tracker timing can be off, above or below ticks. Both mode aligns primary and muted Iqamah times. Existing launcher placements may need resizing/re-adding to adopt smaller defaults. Row widgets can be 1 cell tall. "Always show full layout" keeps every prayer visible at small sizes. The countdown ticks live, and Widget Studio shows a live preview.
 - Onboarding walks through location, notifications, exact alarm, battery and full-screen permissions.
 
 ## Diagnostics
-Updater diagnosis and fixes: `docs/REVIEW_beta9.md`.
+Updater diagnosis and fixes: `docs/REVIEW_beta9.md`. Widget coverage and backup safety review: `docs/REVIEW_beta10.md`.
 If the app crashes, a local crash log is saved on the device. It is never uploaded. Open **Settings > App > Diagnostics** to view it or copy it. See `docs/REVIEW_beta5.md` for the hardening review and `docs/REVIEW_beta7.md` for the Nafl/reminder self-review, plus `docs/REVIEW_beta8.md` for counters and iqamah.
+
+## Backup & restore
+Settings → Backup & restore exports a single versioned JSON using Android's document picker. Import first shows counts/date range and asks for Merge or Replace; an atomic safety snapshot is saved before the transactional DB write. App/widget/counter/iqamah/alarm settings, all logging history and selected custom audio are included. Merge retains newer/larger daily logs without adding duplicate Qada events.
+
+Seven daily local snapshots and ten pre-import/migration recovery points are listed for restore or export. An optional chosen Documents folder receives automatic independent copies; local files alone do **not** survive uninstall. Android Auto Backup explicitly includes the DB, DataStore and snapshots, subject to the device's backup settings/quota. Files are unencrypted (32 MB limit including audio); store them privately. Launcher placements and external ringtone permissions may need reconfiguration. No Google Drive sign-in is needed.
 
 ## Build
 Requirements: JDK 17 and the Android SDK (platform 36). Put the SDK path in `local.properties` (`sdk.dir=...`) or set `ANDROID_HOME`.
@@ -66,7 +71,7 @@ Keep the keystore backed up: every future update must be signed with the same ke
 cp app/build/outputs/apk/release/app-release.apk PrayerApp-v0.2.0-beta.1.apk
 sha256sum PrayerApp-v0.2.0-beta.1.apk > PrayerApp-v0.2.0-beta.1.apk.sha256
 ```
-Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) and attach the `.apk` and `.apk.sha256` files. Optionally add `versionCode: 3` to the notes. The tag name must be the versionName with a `v` prefix. Defaults when the properties are omitted: `0.1.0-beta.9` / `10`.
+Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) and attach the `.apk` and `.apk.sha256` files. Optionally add `versionCode: 3` to the notes. The tag name must be the versionName with a `v` prefix. Defaults when the properties are omitted: `0.1.0-beta.10` / `11`.
 
 ## Permissions
 | Permission | Why |
@@ -93,3 +98,5 @@ City search uses a bundled offline copy of the GeoNames `cities5000` dataset (al
 Work was built in phases, and each phase has an annotated tag (`phase-1-scaffold` … `phase-8-hardening`, then `v0.1.0`, `phase-9-updater`, `phase-10-feedback`). See PROGRESS.md.
 
 Widget rendering tests (real Glance → RemoteViews → bitmap, on an emulator): `./gradlew connectedDebugAndroidTest`.
+
+Native Robolectric widget PNG tests: `./gradlew testDebugUnitTest --tests '*phase18.WidgetRenderedTest'`; renders are written under `app/build/widget-renders/beta10/`.

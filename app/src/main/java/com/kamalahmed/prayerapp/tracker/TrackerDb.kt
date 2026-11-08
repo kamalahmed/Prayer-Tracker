@@ -94,7 +94,7 @@ abstract class TrackerDatabase : RoomDatabase() {
 object TrackerModule {
     @Provides @Singleton
     fun db(@ApplicationContext ctx: Context): TrackerDatabase =
-        Room.databaseBuilder(ctx, TrackerDatabase::class.java, "tracker.db").addMigrations(*TrackerDatabase.MIGRATIONS).build()
+        Room.databaseBuilder(ctx, TrackerDatabase::class.java, "tracker.db").addMigrations(*com.kamalahmed.prayerapp.backup.BackupSnapshots.migrations(ctx, TrackerDatabase.MIGRATIONS)).build()
 
     @Provides fun dao(db: TrackerDatabase): PrayerLogDao = db.dao()
     @Provides fun naflDao(db: TrackerDatabase): com.kamalahmed.prayerapp.nafl.NaflDao = db.nafl()

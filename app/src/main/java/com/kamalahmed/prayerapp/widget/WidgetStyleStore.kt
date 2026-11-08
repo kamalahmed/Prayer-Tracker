@@ -31,6 +31,18 @@ class WidgetStyleStore @Inject constructor(@ApplicationContext private val conte
         context.widgetStyles.edit { it[key(appWidgetId)] = style.sanitized().encode() }
     }
 
+    suspend fun backupExport() = com.kamalahmed.prayerapp.backup.PreferenceJson.encode(context.widgetStyles.data.first())
+    fun validateBackup(obj: org.json.JSONObject) {
+        com.kamalahmed.prayerapp.backup.PreferenceJson.decode(obj).asMap().forEach { (k,v) ->
+            require(k.name.matches(Regex("w[0-9]+")) && v is String && v.length <= 4096) { "Invalid widget style" }
+        }
+    }
+    suspend fun backupRestore(obj: org.json.JSONObject, merge: Boolean) {
+        validateBackup(obj)
+        val source = com.kamalahmed.prayerapp.backup.PreferenceJson.decode(obj)
+        context.widgetStyles.edit { com.kamalahmed.prayerapp.backup.PreferenceJson.apply(it, source, merge) }
+    }
+
     suspend fun delete(ids: IntArray) {
         context.widgetStyles.edit { p -> ids.forEach { p.remove(key(it)) } }
     }

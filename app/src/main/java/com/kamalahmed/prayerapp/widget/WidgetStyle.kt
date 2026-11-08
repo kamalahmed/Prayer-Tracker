@@ -7,7 +7,7 @@ enum class WidgetKind(val label: String, val description: String) {
     ALL_WIDE("All prayers", "4×1 · all five prayers in a row with the hijri day"),
     NEXT_STREAK("Next + streak", "3×2 · next prayer, today's progress and streak"),
     TRACKER("Streak tracker", "4×1 · tap a prayer to mark it prayed"),
-    LARGE("Dashboard", "4×4 · ring, all prayers, hijri date and streak"),
+    LARGE("Dashboard", "4×3 · ring, all prayers, hijri date and streak"),
     MINIMAL("Minimal text", "Text only · next prayer on one line"),
     TASBIH("Tasbih counter", "2×2 · tap to count a selected daily worship"),
     IQAMAH_TABLE("Adhan + Iqamah", "4×3 · all prayers with both time columns"),
@@ -19,6 +19,8 @@ enum class WidgetTheme(val label: String) { GLASS("Glass"), SOLID("Solid"), MINI
 
 /** Where the background panel sits inside a taller/wider widget cell. */
 enum class WidgetAlign(val label: String) { TOP("Top"), CENTER("Center"), BOTTOM("Bottom") }
+
+enum class TickTimes(val label: String) { OFF("Off"), ABOVE("Above tick"), BELOW("Below tick") }
 
 enum class WidgetWeight(val label: String) { NORMAL("Regular"), MEDIUM("Medium"), BOLD("Bold") }
 
@@ -68,28 +70,35 @@ data class WidgetStyle(
     val alwaysFull: Boolean = false,
     val timeMode: WidgetTimeMode = WidgetTimeMode.START,
     val counterId: String = "istighfar",
+    val contentScale: Float = 1f,
+    val fillPanel: Boolean = true,
+    val outerMargin: Int = 0,
+    val tickTimes: TickTimes = TickTimes.OFF,
 ) {
     fun use24h(app: Boolean) = when (clock24) { Tri.APP -> app; Tri.ON -> true; Tri.OFF -> false }
     fun abbr(app: Boolean) = when (abbreviations) { Tri.APP -> app; Tri.ON -> true; Tri.OFF -> false }
 
     fun encode(): String = listOf(
-        "v" to "2", "theme" to theme.name, "accent" to accent.toString(), "opacity" to opacity.toString(),
+        "v" to "3", "theme" to theme.name, "accent" to accent.toString(), "opacity" to opacity.toString(),
         "corner" to corner.toString(), "padv" to padV.toString(), "padh" to padH.toString(), "spacing" to spacing.toString(), "align" to align.name,
         "text" to fmt(textScale), "icon" to fmt(iconScale), "box" to fmt(boxScale), "weight" to weight.name,
         "hijri" to b(showHijri), "countdown" to b(showCountdown), "icons" to b(showIcons), "ampm" to b(showAmPm),
         "sunrise" to b(showSunrise), "midnight" to b(showMidnight), "clock" to clock24.name, "abbr" to abbreviations.name,
+        "scale" to fmt(contentScale), "fill" to b(fillPanel), "margin" to outerMargin.toString(), "ticks" to tickTimes.name,
         "full" to b(alwaysFull), "times" to timeMode.name, "counter" to counterId,
     ).joinToString(";") { "${it.first}=${it.second}" }
 
     /** Values clamped into their valid ranges. */
     fun sanitized() = copy(
+        contentScale = finite(contentScale, 0.6f, 1.5f), outerMargin = outerMargin.coerceIn(0, 24),
         counterId = counterId.take(80).filter { it.isLetterOrDigit() || it == '_' || it == '-' },
         opacity = opacity.coerceIn(0, 100), corner = corner.coerceIn(0, 40), padV = padV.coerceIn(0, 32), padH = padH.coerceIn(0, 32),
-        spacing = spacing.coerceIn(0, 24), textScale = textScale.coerceIn(0.6f, 1.8f),
-        iconScale = iconScale.coerceIn(0.5f, 1.8f), boxScale = boxScale.coerceIn(0.6f, 1.5f),
+        spacing = spacing.coerceIn(0, 24), textScale = finite(textScale, 0.6f, 1.8f),
+        iconScale = finite(iconScale, 0.5f, 1.8f), boxScale = finite(boxScale, 0.6f, 1.5f),
     )
 
     companion object {
+        private fun finite(f: Float, min: Float, max: Float) = if (f.isFinite()) f.coerceIn(min, max) else 1f
         private fun b(v: Boolean) = if (v) "1" else "0"
         private fun fmt(f: Float) = String.format(Locale.US, "%.2f", f)
 
@@ -137,6 +146,9 @@ data class WidgetStyle(
                 alwaysFull = bool("full", d.alwaysFull),
                 timeMode = WidgetTimeMode.entries.firstOrNull { it.name == m["times"] } ?: d.timeMode,
                 counterId = m["counter"] ?: d.counterId,
+                contentScale = float("scale", d.contentScale),
+                fillPanel = bool("fill", d.fillPanel), outerMargin = int("margin", d.outerMargin),
+                tickTimes = TickTimes.entries.firstOrNull { it.name == m["ticks"] } ?: d.tickTimes,
             ).sanitized()
         }
     }
@@ -212,6 +224,29 @@ data class WidgetDims(val padTop: Int, val padBottom: Int, val padStart: Int, va
  * shrinks, so a widget can't "collapse" to one prayer because a launcher reported a small size.
  */
 object WidgetLayout {
+    fun wideCounter(widthDp: Float, heightDp: Float) = widthDp >= heightDp * 1.7f || heightDp < 112f
+
+    /** Fit typography, icons and hit areas to the actual launcher allocation, not a fixed panel. */
+    fun fitScale(kind: WidgetKind, widthDp: Float, heightDp: Float, style: WidgetStyle): Float {
+        if (!widthDp.isFinite() || !heightDp.isFinite() || widthDp <= 0 || heightDp <= 0) return 1f
+        val both = style.timeMode == WidgetTimeMode.BOTH
+        val ticks = style.tickTimes != TickTimes.OFF
+        val (w, h) = when (kind) {
+            WidgetKind.NEXT_SMALL -> 125f to (if (both) 130f else 110f)
+            WidgetKind.ALL_WIDE -> 280f to (if (heightDp < WIDE_COMPACT_H && !style.alwaysFull) { if (both) 60f else 36f } else if (both) 124f else 90f)
+            WidgetKind.NEXT_STREAK -> 245f to (if (ticks) 150f else 125f)
+            WidgetKind.TRACKER -> 275f to (if (ticks) { if (both) 110f else 95f } else 72f)
+            WidgetKind.LARGE -> 280f to (if (both) 400f else 310f)
+            WidgetKind.IQAMAH_TABLE -> 280f to 235f
+            WidgetKind.MINIMAL -> 260f to (if (both) 65f else 42f)
+            WidgetKind.TASBIH -> if (wideCounter(widthDp, heightDp)) 245f to 50f else 135f to 130f
+        }
+        val s = style.sanitized()
+        val availW = (widthDp - 2 * (s.outerMargin + s.padH)).coerceAtLeast(1f)
+        val availH = (heightDp - 2 * (s.outerMargin + s.padV)).coerceAtLeast(1f)
+        return minOf(availW / w, availH / h).coerceIn(0.35f, 1.6f)
+    }
+
     /** Heights below these (dp) drop secondary details. */
     const val WIDE_COMPACT_H = 100
     const val STREAK_COMPACT_H = 130
