@@ -41,18 +41,25 @@ class AlarmReceiver : BroadcastReceiver() {
                 val zone = runCatching { ZoneId.of(s.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
                 val timeText = TimeFormat.time(Instant.ofEpochMilli(prayerTime).atZone(zone), s.use24h)
                 if (!stale) when (type) {
-                    AlarmType.PRAYER, AlarmType.SNOOZE -> onPrayer(context, s.mode(prayer), prayer, prayerTime, timeText, s.iqamaEnabled, s.iqama(prayer), type == AlarmType.SNOOZE)
+                    AlarmType.PRAYER, AlarmType.SNOOZE -> onPrayer(context, s.mode(prayer), prayer, prayerTime, timeText, s.iqamaEnabled, Iqamah.time(s,prayer,Instant.ofEpochMilli(prayerTime).atZone(zone))?.toInstant()?.toEpochMilli(), type == AlarmType.SNOOZE)
                     AlarmType.REMINDER -> context.notifySafely(
                         NotificationIds.reminder(prayer.ordinal),
                         baseNotification(context, Channels.REMINDER, "${prayer.displayName} in ${s.preReminderMinutes} min", "${prayer.displayName} at $timeText")
                             .setCategory(NotificationCompat.CATEGORY_REMINDER)
                             .setTimeoutAfter(s.preReminderMinutes * 60_000L),
                     )
-                    AlarmType.IQAMA -> context.notifySafely(
-                        NotificationIds.iqama(prayer.ordinal),
-                        baseNotification(context, Channels.BEEP, "Iqama – ${prayer.displayName}", "Iqama time now")
-                            .setTimeoutAfter(10 * 60_000L),
-                    )
+                    AlarmType.IQAMA -> Unit // legacy boundary refresh; audible notices are separately opt-in
+                    AlarmType.IQAMA_NOTICE -> {
+                        val adhan = Instant.ofEpochMilli(prayerTime).atZone(zone)
+                        val iq = Iqamah.time(s,prayer,adhan)
+                        if (iq != null && Iqamah.enabled(s,prayer,adhan)) {
+                            val name = Iqamah.label(s,prayer,adhan)
+                            val lead = Iqamah.lead(s,prayer,adhan)
+                            context.notifySafely(1500 + prayer.ordinal,
+                                baseNotification(context, Channels.BEEP, if (lead == 0) "Iqamah – $name" else "Iqamah – $name in $lead min",
+                                    "Iqamah at ${TimeFormat.time(iq, false)}").setCategory(NotificationCompat.CATEGORY_REMINDER).setTimeoutAfter(10 * 60_000L))
+                        }
+                    }
                 }
             } finally {
                 // Always re-arm the next alarms, even if showing this one failed; otherwise one bad alarm
@@ -65,7 +72,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
     private fun onPrayer(
         ctx: Context, mode: NotifyMode, prayer: Prayer, prayerTime: Long, timeText: String,
-        iqamaOn: Boolean, iqamaMin: Int, snoozed: Boolean,
+        iqamaOn: Boolean, iqamaEnd: Long?, snoozed: Boolean,
     ) {
         val id = NotificationIds.prayer(prayer.ordinal)
         when (if (snoozed) NotifyMode.ADHAN else mode) {
@@ -81,8 +88,9 @@ class AlarmReceiver : BroadcastReceiver() {
                 ctx.notifySafely(id, prayerNotification(ctx, Channels.BEEP, prayer, prayerTime, timeText))
             }
         }
-        if (iqamaOn && prayer.isPrayer && iqamaMin > 0 && !snoozed) {
-            val end = prayerTime + iqamaMin * 60_000L
+        if (iqamaOn && prayer.isPrayer && iqamaEnd != null && iqamaEnd > System.currentTimeMillis() && !snoozed) {
+            val end = iqamaEnd
+            val iqamaMin = ((end - prayerTime) / 60_000L).coerceAtLeast(0)
             ctx.notifySafely(
                 NotificationIds.iqama(prayer.ordinal),
                 baseNotification(ctx, Channels.IQAMA, "Iqama countdown – ${prayer.displayName}", "Iqama in $iqamaMin min")

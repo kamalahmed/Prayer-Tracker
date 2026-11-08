@@ -10,6 +10,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import java.time.ZonedDateTime
+import kotlinx.coroutines.flow.first
 
 /** Widgets, receivers and action callbacks are created by the system, so they reach Hilt through this. */
 @EntryPoint
@@ -17,6 +18,7 @@ import java.time.ZonedDateTime
 interface WidgetEntryPoint {
     fun settings(): SettingsRepository
     fun tracker(): TrackerRepository
+    fun nafl(): com.kamalahmed.prayerapp.nafl.NaflRepository
     fun styles(): WidgetStyleStore
 }
 
@@ -26,5 +28,6 @@ fun widgetDeps(context: Context): WidgetEntryPoint =
 suspend fun WidgetEntryPoint.loadWidgetData(): WidgetData {
     val s = settings().current()
     val schedule = PrayerSchedule(s.toCalcParams())
-    return WidgetData.build(schedule, s, tracker().snapshot(), ZonedDateTime.now(schedule.zone))
+    return WidgetData.build(schedule, s, tracker().snapshot(), ZonedDateTime.now(schedule.zone)).copy(
+        counterItems = nafl().items.first(), counterLogs = nafl().logs.first())
 }

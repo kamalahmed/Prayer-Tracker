@@ -48,6 +48,7 @@ class WidgetConfigActivity : ComponentActivity() {
                 var failed by remember { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
                     try {
+                        widgetDeps(this@WidgetConfigActivity).nafl().ensureDefaults()
                         isNew = !styles.has(id)
                         style = com.kamalahmed.prayerapp.core.safety.guard(TAG, "style") { styles.get(id, kind) } ?: WidgetStyle.decode(null, kind)
                         data = widgetDeps(this@WidgetConfigActivity).loadWidgetData()

@@ -66,6 +66,8 @@ fun previewSize(kind: WidgetKind): DpSize = when (kind) {
     WidgetKind.NEXT_STREAK -> DpSize(290.dp, 165.dp)
     WidgetKind.TRACKER -> DpSize(320.dp, 140.dp)
     WidgetKind.LARGE -> DpSize(320.dp, 330.dp)
+    WidgetKind.TASBIH -> DpSize(230.dp, 220.dp)
+    WidgetKind.IQAMAH_TABLE -> DpSize(320.dp, 300.dp)
     WidgetKind.MINIMAL -> DpSize(300.dp, 64.dp)
 }
 
@@ -135,6 +137,26 @@ fun WidgetConfigScreen(
                 )
             }
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
+                if (kind == WidgetKind.TASBIH) {
+                    SectionHeader("Counter item")
+                    CardGroup {
+                        FlowRow(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            data.counterItems.filter { it.isCounter && it.enabled }.forEach { item ->
+                                FilterChip(selected = style.counterId == item.id, onClick = { set { copy(counterId = item.id) } }, label = { Text(item.name) })
+                            }
+                        }
+                        Text("Add custom counters in Streaks → Nafl → Customize worship.", Modifier.padding(12.dp))
+                    }
+                } else if (kind != WidgetKind.IQAMAH_TABLE) {
+                    SectionHeader("Times to show")
+                    CardGroup {
+                        FlowRow(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            WidgetTimeMode.entries.forEach { mode ->
+                                FilterChip(selected = style.timeMode == mode, onClick = { set { copy(timeMode = mode) } }, label = { Text(mode.label) })
+                            }
+                        }
+                    }
+                }
                 SectionHeader("Theme")
                 CardGroup {
                     FlowRow(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

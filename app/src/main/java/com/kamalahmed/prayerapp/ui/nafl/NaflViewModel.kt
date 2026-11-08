@@ -61,6 +61,7 @@ class NaflViewModel @Inject constructor(private val repo: NaflRepository, privat
         io { repo.saveLog(date, item.id, count, pages, minutes) }
     }
     fun item(item: NaflItem) = io { repo.saveItem(item) }
+    fun addTyped(name: String, type: String, target: Int) = io { repo.addItem(name,type,target) }
     fun add(name: String) = io { repo.addItem(name) }
     fun reminder(r: QuranReminder) = io { repo.saveReminder(r); scheduler.reschedule() }
     fun removeReminder(id: Long) = io { scheduler.remove(id) }

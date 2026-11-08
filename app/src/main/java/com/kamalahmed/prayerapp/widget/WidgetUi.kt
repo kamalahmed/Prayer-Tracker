@@ -15,6 +15,7 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
@@ -46,6 +47,7 @@ import com.kamalahmed.prayerapp.core.model.TimeFormat
 import com.kamalahmed.prayerapp.tracker.PrayerStatus
 import com.kamalahmed.prayerapp.tracker.StreakCalculator
 import java.time.ZonedDateTime
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -71,7 +73,22 @@ class WidgetUiState(val style: WidgetStyle, val data: WidgetData, val interactiv
     )
 
     fun time(t: ZonedDateTime) = TimeFormat.time(t, use24h, style.showAmPm)
+    val next: com.kamalahmed.prayerapp.core.prayer.PrayerEvent get() = if (style.timeMode == WidgetTimeMode.IQAMAH) data.iqamahEvents.firstOrNull { it.time > data.now } ?: data.next else data.next
+    fun iqamahForNext(): ZonedDateTime? = data.iqamahEvents.firstOrNull { it.prayer == next.prayer && it.time >= next.time }?.time
+    fun rowTime(r: WidgetRow): String = when (style.timeMode) {
+        WidgetTimeMode.START -> time(r.time)
+        WidgetTimeMode.IQAMAH -> r.iqamah?.let(::time) ?: "—"
+        WidgetTimeMode.BOTH -> "A ${time(r.time)}\nI ${r.iqamah?.let(::time) ?: "—"}"
+    }
     fun label(p: Prayer) = p.label(abbr)
+    val progress: Float get() {
+        if (style.timeMode != WidgetTimeMode.IQAMAH) return data.progress
+        val previous = data.iqamahEvents.lastOrNull { it.time <= data.now }?.time ?: return 0f
+        val total = next.time.toEpochSecond() - previous.toEpochSecond()
+        return if (total <= 0) 0f else ((data.now.toEpochSecond() - previous.toEpochSecond()).toFloat()/total).coerceIn(0f,1f)
+    }
+    fun passed(r: WidgetRow) = if (style.timeMode == WidgetTimeMode.IQAMAH) (r.iqamah ?: r.time) <= data.now else r.passed
+    fun isNext(r: WidgetRow) = r.prayer == next.prayer && (if (style.timeMode == WidgetTimeMode.IQAMAH) r.iqamah else r.time) == next.time
     fun rowLabel(r: WidgetRow) = if (abbr) r.abbr else r.name
 
     @Composable
@@ -82,7 +99,11 @@ class WidgetUiState(val style: WidgetStyle, val data: WidgetData, val interactiv
 
     /** Rows for list layouts honouring the Sunrise / Midnight toggles. */
     fun listRows(): List<WidgetRow> = buildList {
-        addAll(data.rows.filter { it.prayer != Prayer.SUNRISE || style.showSunrise })
+        // Keep today's Isha visible until its iqamah when adhan lists already rolled to tomorrow.
+        val rows = if (style.timeMode != WidgetTimeMode.START && data.listDate > data.today && data.todayIqamah.values.any { it > data.now })
+            data.todayTimes.entries.sortedBy { it.value }.map { (p,t) -> WidgetRow(p,p.displayName,p.abbr,t,WidgetData.icon(p),false,t <= data.now,data.todayIqamah[p]) }
+            else data.rows
+        addAll(rows.filter { it.prayer != Prayer.SUNRISE || style.showSunrise })
         if (style.showMidnight) add(data.midnight)
     }
 }
@@ -94,7 +115,7 @@ fun WidgetContent(kind: WidgetKind, style: WidgetStyle, data: WidgetData, intera
     // Root: full cell, always fully transparent. Only the inner panel (wrap-content height) gets a background,
     // so a tall cell no longer shows a big empty tinted area above/below the content.
     var root = GlanceModifier.fillMaxSize()
-    if (interactive) root = root.clickable(actionStartActivity<MainActivity>())
+    if (interactive && kind != WidgetKind.TASBIH) root = root.clickable(actionStartActivity<MainActivity>())
     val align = when (style.align) {
         WidgetAlign.TOP -> Alignment.TopCenter
         WidgetAlign.CENTER -> Alignment.Center
@@ -110,6 +131,8 @@ fun WidgetContent(kind: WidgetKind, style: WidgetStyle, data: WidgetData, intera
                 WidgetKind.NEXT_STREAK -> NextStreak(ui)
                 WidgetKind.TRACKER -> Tracker(ui)
                 WidgetKind.LARGE -> Large(ui)
+                WidgetKind.TASBIH -> TasbihContent(ui)
+                WidgetKind.IQAMAH_TABLE -> IqamahTable(ui)
                 WidgetKind.MINIMAL -> Minimal(ui)
             }
         }
@@ -237,14 +260,15 @@ private fun NextSmall(ui: WidgetUiState) {
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (ui.style.showIcons) {
-                Icon(WidgetData.icon(d.next.prayer), ui.icon(18), ui.pal.accent)
+                Icon(WidgetData.icon(ui.next.prayer), ui.icon(18), ui.pal.accent)
                 Spacer(GlanceModifier.width(6.dp))
             }
-            Text(d.next.prayer.displayName, style = ui.ts(15f), maxLines = 1)
+            Text(ui.next.prayer.displayName, style = ui.ts(15f), maxLines = 1)
         }
-        Text(ui.time(d.next.time), style = ui.ts(30f, bold = true), maxLines = 1, modifier = GlanceModifier.padding(top = ui.gap))
+        Text(ui.time(ui.next.time), style = ui.ts(30f, bold = true), maxLines = 1, modifier = GlanceModifier.padding(top = ui.gap))
+        NextIqamah(ui)
         if (ui.style.showCountdown) {
-            Box(GlanceModifier.padding(top = ui.gap / 2)) { Countdown(ui, d.next.time, 13f, ui.pal.accent, "in ") }
+            Box(GlanceModifier.padding(top = ui.gap / 2)) { Countdown(ui, ui.next.time, 13f, ui.pal.accent, "in ") }
         }
         if (ui.style.showHijri) {
             Text("${d.hijri.day} ${d.hijri.monthName}", style = ui.ts(11f, ui.pal.gold), maxLines = 1, modifier = GlanceModifier.padding(top = ui.gap))
@@ -258,10 +282,10 @@ private fun AllWide(ui: WidgetUiState) {
     val compact = ui.compact(WidgetKind.ALL_WIDE)
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(d.next.prayer.displayName, style = ui.ts(16f, bold = true), maxLines = 1)
+            Text(ui.next.prayer.displayName, style = ui.ts(16f, bold = true), maxLines = 1)
             Spacer(GlanceModifier.width(8.dp))
-            if (ui.style.showCountdown) Countdown(ui, d.next.time, 15f, ui.pal.sub)
-            else Text(ui.time(d.next.time), style = ui.ts(15f, ui.pal.sub), maxLines = 1)
+            if (ui.style.showCountdown) Countdown(ui, ui.next.time, 15f, ui.pal.sub)
+            else Text(ui.time(ui.next.time), style = ui.ts(15f, ui.pal.sub), maxLines = 1)
             Spacer(GlanceModifier.defaultWeight())
             if (ui.style.showHijri) HijriBadge(ui)
         }
@@ -274,16 +298,16 @@ private fun AllWide(ui: WidgetUiState) {
 
 @Composable
 private fun RowScope.WideCell(ui: WidgetUiState, r: WidgetRow, showIcon: Boolean) {
-    val c = if (r.isNext) ui.pal.accent else ui.pal.sub
+    val c = if (ui.isNext(r)) ui.pal.accent else ui.pal.sub
     var m = GlanceModifier.defaultWeight().padding(vertical = (ui.style.spacing / 2).dp)
-    if (r.isNext && ui.pal.highlight != 0) m = m.then(highlight(ui))
+    if (ui.isNext(r) && ui.pal.highlight != 0) m = m.then(highlight(ui))
     Column(modifier = m, horizontalAlignment = Alignment.CenterHorizontally) {
         if (showIcon) {
             Icon(r.icon, ui.icon(16), c)
             Spacer(GlanceModifier.height((ui.style.spacing / 3).dp))
         }
         Text(ui.rowLabel(r), style = ui.ts(11f, c), maxLines = 1)
-        Text(ui.time(r.time), style = ui.ts(13f, if (r.isNext) ui.pal.accent else ui.pal.text), maxLines = 1)
+        Text(ui.rowTime(r), style = ui.ts(12f, if (ui.isNext(r)) ui.pal.accent else ui.pal.text), maxLines = 2)
     }
 }
 
@@ -296,13 +320,14 @@ private fun NextStreak(ui: WidgetUiState) {
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (ui.style.showIcons) {
-                        Icon(WidgetData.icon(d.next.prayer), ui.icon(16), ui.pal.accent)
+                        Icon(WidgetData.icon(ui.next.prayer), ui.icon(16), ui.pal.accent)
                         Spacer(GlanceModifier.width(5.dp))
                     }
-                    Text(d.next.prayer.displayName, style = ui.ts(14f), maxLines = 1)
+                    Text(ui.next.prayer.displayName, style = ui.ts(14f), maxLines = 1)
                 }
-                Text(ui.time(d.next.time), style = ui.ts(26f, bold = true), maxLines = 1)
-                if (ui.style.showCountdown) Countdown(ui, d.next.time, 12f, ui.pal.accent, "in ")
+                Text(ui.time(ui.next.time), style = ui.ts(26f, bold = true), maxLines = 1)
+                NextIqamah(ui)
+                if (ui.style.showCountdown) Countdown(ui, ui.next.time, 12f, ui.pal.accent, "in ")
             }
             Column(horizontalAlignment = Alignment.End) {
                 Streak(ui, 24f)
@@ -344,7 +369,9 @@ private fun Tracker(ui: WidgetUiState) {
                 Column(modifier = GlanceModifier.defaultWeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                     StatusDot(ui, p, ui.box(if (compact) 26 else 32))
                     Text(ui.label(p), style = ui.ts(10f, ui.pal.sub), maxLines = 1, modifier = GlanceModifier.padding(top = (ui.style.spacing / 3).dp))
-                    if (!compact) d.todayTimes[p]?.let { Text(ui.time(it), style = ui.ts(10f, ui.pal.text), maxLines = 1) }
+                    if (!compact) d.todayTimes[p]?.let { at ->
+                        Text(ui.rowTime(WidgetRow(p,p.displayName,p.abbr,at,0,false,false,d.todayIqamah[p])), style = ui.ts(10f,ui.pal.text), maxLines = 2)
+                    }
                 }
             }
         }
@@ -369,14 +396,15 @@ private fun Large(ui: WidgetUiState) {
         Row(modifier = GlanceModifier.fillMaxWidth().padding(vertical = ui.gap), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = GlanceModifier.size(ringDp), contentAlignment = Alignment.Center) {
                 val ring = WidgetBitmaps.ring(
-                    ringDp.value, ctx.resources.displayMetrics.density, d.progress,
+                    ringDp.value, ctx.resources.displayMetrics.density, ui.progress,
                     WidgetPalette.withAlpha(ui.pal.text, 0.12f), ui.pal.accent, 7f * ui.style.boxScale,
                 )
                 Image(ImageProvider(ring), contentDescription = null, modifier = GlanceModifier.size(ringDp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(ui.label(d.next.prayer), style = ui.ts(12f, ui.pal.sub), maxLines = 1)
-                    Text(ui.time(d.next.time), style = ui.ts(16f, bold = true), maxLines = 1)
-                    if (ui.style.showCountdown) Countdown(ui, d.next.time, 11f, ui.pal.accent)
+                    Text(ui.label(ui.next.prayer), style = ui.ts(12f, ui.pal.sub), maxLines = 1)
+                    Text(ui.time(ui.next.time), style = ui.ts(16f, bold = true), maxLines = 1)
+                    NextIqamah(ui)
+                    if (ui.style.showCountdown) Countdown(ui, ui.next.time, 11f, ui.pal.accent)
                 }
             }
             Spacer(GlanceModifier.width(12.dp))
@@ -399,20 +427,20 @@ private fun Large(ui: WidgetUiState) {
 @Composable
 private fun LargeRow(ui: WidgetUiState, r: WidgetRow) {
     var m = GlanceModifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = (ui.style.spacing / 2).dp)
-    if (r.isNext && ui.pal.highlight != 0) m = m.then(highlight(ui))
+    if (ui.isNext(r) && ui.pal.highlight != 0) m = m.then(highlight(ui))
     val c = when {
-        r.isNext -> ui.pal.accent
-        r.passed -> ui.pal.sub
+        ui.isNext(r) -> ui.pal.accent
+        ui.passed(r) -> ui.pal.sub
         else -> ui.pal.text
     }
     Row(modifier = m, verticalAlignment = Alignment.CenterVertically) {
         if (ui.style.showIcons) {
-            Icon(r.icon, ui.icon(16), if (r.isNext) ui.pal.accent else ui.pal.sub)
+            Icon(r.icon, ui.icon(16), if (ui.isNext(r)) ui.pal.accent else ui.pal.sub)
             Spacer(GlanceModifier.width(8.dp))
         }
         Text(ui.rowLabel(r), style = ui.ts(13f, c), maxLines = 1)
         Spacer(GlanceModifier.defaultWeight())
-        Text(ui.time(r.time), style = ui.ts(13f, c, bold = r.isNext), maxLines = 1)
+        Text(ui.rowTime(r), style = ui.ts(12f, c, bold = ui.isNext(r)), maxLines = 2)
     }
 }
 
@@ -422,15 +450,63 @@ private fun Minimal(ui: WidgetUiState) {
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (ui.style.showIcons) {
-                Icon(WidgetData.icon(d.next.prayer), ui.icon(16), ui.pal.accent)
+                Icon(WidgetData.icon(ui.next.prayer), ui.icon(16), ui.pal.accent)
                 Spacer(GlanceModifier.width(6.dp))
             }
-            Text("${ui.label(d.next.prayer)} ${ui.time(d.next.time)}", style = ui.ts(16f), maxLines = 1)
+            Text("${ui.label(ui.next.prayer)} ${if (ui.style.timeMode == WidgetTimeMode.IQAMAH) "Iqamah " else ""}${ui.time(ui.next.time)}" + if (ui.style.timeMode == WidgetTimeMode.BOTH) " / I ${ui.iqamahForNext()?.let(ui::time) ?: "—"}" else "", style = ui.ts(14f), maxLines = 2)
             if (ui.style.showCountdown) {
                 Text("  ·  ", style = ui.ts(14f, ui.pal.sub), maxLines = 1)
-                Countdown(ui, d.next.time, 14f, ui.pal.sub)
+                Countdown(ui, ui.next.time, 14f, ui.pal.sub)
             }
         }
         if (ui.style.showHijri) Text(d.hijri.format(), style = ui.ts(11f, ui.pal.gold), maxLines = 1)
+    }
+}
+
+@Composable
+private fun NextIqamah(ui: WidgetUiState) {
+    if (ui.style.timeMode == WidgetTimeMode.BOTH) Text("Iqamah ${ui.iqamahForNext()?.let(ui::time) ?: "—"}", style = ui.ts(11f,ui.pal.sub), maxLines = 1)
+    else if (ui.style.timeMode == WidgetTimeMode.IQAMAH) Text("Iqamah time", style = ui.ts(10f,ui.pal.sub), maxLines = 1)
+}
+
+@Composable
+private fun IqamahTable(ui: WidgetUiState) {
+    Column(GlanceModifier.fillMaxWidth()) {
+        Text("Adhan + Iqamah", style = ui.ts(16f,bold = true), maxLines = 1)
+        Text(ui.data.listDate.toString(), style = ui.ts(10f,ui.pal.sub))
+        Row(GlanceModifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            Text("Prayer", GlanceModifier.defaultWeight(), style = ui.ts(11f,ui.pal.sub))
+            Text("Adhan", GlanceModifier.defaultWeight(), style = ui.ts(11f,ui.pal.sub))
+            Text("Iqamah", GlanceModifier.defaultWeight(), style = ui.ts(11f,ui.pal.sub))
+        }
+        ui.listRows().filter { it.prayer?.isPrayer == true }.forEach { row ->
+            Row(GlanceModifier.fillMaxWidth().padding(vertical = 7.dp)) {
+                Text(ui.rowLabel(row), GlanceModifier.defaultWeight(), style = ui.ts(12f))
+                Text(ui.time(row.time), GlanceModifier.defaultWeight(), style = ui.ts(12f))
+                Text(row.iqamah?.let(ui::time) ?: "—", GlanceModifier.defaultWeight(), style = ui.ts(12f,ui.pal.accent))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TasbihContent(ui: WidgetUiState) {
+    val item = ui.data.counterItems.firstOrNull { it.id == ui.style.counterId && it.isCounter && it.enabled }
+    val count = ui.data.counterLogs.firstOrNull { it.itemId == item?.id && it.date == ui.data.now.withZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDate().toString() }?.count ?: 0
+    Column(GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(item?.name ?: "Select a counter", style = ui.ts(16f,bold = true), maxLines = 1)
+        Text("Today · tap to count", style = ui.ts(10f,ui.pal.sub))
+        var tap = GlanceModifier.fillMaxWidth().height(78.dp)
+        if (ui.interactive && item != null) tap = tap.clickable(actionRunCallback<TasbihAction>(actionParametersOf(TasbihAction.Delta to 1)))
+        Box(tap, contentAlignment = Alignment.Center) {
+            Text("$count", style = ui.ts(42f,ui.pal.accent,bold = true), maxLines = 1)
+        }
+        Text(if ((item?.dailyTarget ?: 0) > 0) "Target ${item!!.dailyTarget}" else "No daily target", style = ui.ts(11f,ui.pal.sub))
+        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            var minus = GlanceModifier.defaultWeight().height(44.dp)
+            if (ui.interactive && item != null) minus = minus.clickable(actionRunCallback<TasbihAction>(actionParametersOf(TasbihAction.Delta to -1)))
+            Box(minus, contentAlignment = Alignment.Center) { Text("−1",style = ui.ts(18f)) }
+            Text("Open", GlanceModifier.defaultWeight().padding(12.dp).clickable(actionStartActivity<com.kamalahmed.prayerapp.ui.nafl.TasbihActivity>(actionParametersOf(ActionParameters.Key<String>("counterId") to ui.style.counterId))), style = ui.ts(12f))
+        }
     }
 }

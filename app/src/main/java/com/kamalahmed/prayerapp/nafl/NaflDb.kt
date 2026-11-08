@@ -13,7 +13,9 @@ data class NaflItem(
     val baseline: Boolean = false,
     val enabled: Boolean = true,
     val position: Int = 0,
-)
+    @ColumnInfo(defaultValue = "'CHECKBOX'") val type: String = "CHECKBOX",
+    @ColumnInfo(defaultValue = "0") val dailyTarget: Int = 0,
+) { val isCounter: Boolean get() = type == "COUNTER" }
 @Entity(tableName = "nafl_log", primaryKeys = ["date", "itemId"])
 data class NaflLog(val date: String, val itemId: String, val count: Int = 0, val pages: Int = 0, val minutes: Int = 0)
 @Entity(tableName = "quran_reminder")
@@ -30,6 +32,18 @@ interface NaflDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertDefaults(items: List<NaflItem>)
     @Upsert suspend fun saveItem(item: NaflItem)
     @Upsert suspend fun saveLog(log: NaflLog)
+    @Query("SELECT * FROM nafl_item WHERE id = :id") suspend fun item(id: String): NaflItem?
+    @Query("SELECT * FROM nafl_log WHERE date = :date AND itemId = :id") suspend fun log(date: String, id: String): NaflLog?
+    /** Room transaction serializes app and widget writes, including separate repository instances. */
+    @Transaction suspend fun adjustCounter(date: String, id: String, delta: Int): CounterResult {
+        val item = item(id) ?: throw IllegalArgumentException("Counter not found")
+        require(item.isCounter && item.enabled) { "This counter is hidden or unavailable" }
+        val row = log(date, id) ?: NaflLog(date, id)
+        val old = row.count.coerceIn(0, 1_000_000)
+        val next = (old.toLong() + delta).coerceIn(0L, 1_000_000L).toInt()
+        saveLog(row.copy(count = next))
+        return CounterResult(old, next, item.dailyTarget > 0 && old < item.dailyTarget && next >= item.dailyTarget)
+    }
     @Upsert suspend fun saveReminder(reminder: QuranReminder): Long
     @Query("DELETE FROM quran_reminder WHERE id = :id") suspend fun deleteReminder(id: Long)
 }
@@ -45,8 +59,16 @@ object NaflDefaults {
         NaflItem("witr", "Witr", "SUNNAH", 3, enabled = false, position = 6),
         NaflItem("quran", "Quran reading", position = 7),
         NaflItem("tahajjud", "Tahajjud", position = 8),
-        NaflItem("dhikr", "Tasbih / dhikr", position = 9),
+        NaflItem("dhikr", "Tasbih / dhikr", position = 9, type = "COUNTER"),
         NaflItem("ruqyah", "Ruqyah", position = 10),
         NaflItem("duha", "Duha", position = 11),
+        NaflItem("istighfar", "Istighfar", position = 12, type = "COUNTER", dailyTarget = 100),
+        NaflItem("salawat", "Durud / Salawat", position = 13, type = "COUNTER", dailyTarget = 100),
+        NaflItem("subhanallah", "SubhanAllah", position = 14, type = "COUNTER", dailyTarget = 33),
+        NaflItem("alhamdulillah", "Alhamdulillah", position = 15, type = "COUNTER", dailyTarget = 33),
+        NaflItem("allahuakbar", "Allahu Akbar", position = 16, type = "COUNTER", dailyTarget = 33),
+        NaflItem("lailaha", "La ilaha illallah", position = 17, type = "COUNTER", dailyTarget = 100),
     )
 }
+
+data class CounterResult(val before: Int, val after: Int, val targetReached: Boolean)

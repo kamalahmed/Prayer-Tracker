@@ -7,4 +7,6 @@
     <string name="widget_desc_large">Dashboard: ring countdown, all prayers, hijri date and streak</string>
     <string name="widget_desc_minimal">Just the next prayer, as text</string>
     <string name="widget_customize">Customize widget</string>
+    <string name="widget_tasbih">Tasbih counter</string>
+    <string name="widget_iqamah">Adhan + Iqamah</string>
 </resources>

@@ -35,7 +35,7 @@ object NaflStats {
         val ranks = items.map { item ->
             val own = filtered.filter { it.itemId == item.id }
             val days = own.count { it.count > 0 }
-            NaflItemStats(item, own.sumOf { it.count.coerceIn(0, 10_000) }, days, if (elapsed == 0) 0 else days * 100 / elapsed, streak(logs, item.id, today))
+            NaflItemStats(item, own.sumOf { it.count.coerceIn(0, 1_000_000) }, days, if (elapsed == 0) 0 else days * 100 / elapsed, streak(logs, item.id, today))
         }
         val quran = filtered.filter { it.itemId == "quran" }
         return NaflReport(Stats.title(period, start, end, Locale.getDefault()), ranks, daily, quran.count { it.count > 0 },

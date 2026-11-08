@@ -31,6 +31,15 @@ data class AppSettings(
     val iqamaMinutes: Map<Prayer, Int> = mapOf(
         Prayer.FAJR to 25, Prayer.DHUHR to 20, Prayer.ASR to 20, Prayer.MAGHRIB to 5, Prayer.ISHA to 20,
     ),
+    val iqamaFixed: Map<Prayer, Int> = emptyMap(),
+    val iqamaNotifications: Set<Prayer> = emptySet(),
+    val iqamaBefore: Map<Prayer, Int> = emptyMap(),
+    val jumuahEnabled: Boolean = false,
+    val jumuahFixed: Boolean = true,
+    val jumuahOffset: Int = 20,
+    val jumuahMinute: Int = 13 * 60,
+    val jumuahNotify: Boolean = false,
+    val jumuahBefore: Int = 0,
     // Notifications
     val notifyModes: Map<Prayer, NotifyMode> = Prayer.entries.associateWith {
         if (it == Prayer.SUNRISE) NotifyMode.OFF else NotifyMode.ADHAN

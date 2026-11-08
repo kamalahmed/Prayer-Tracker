@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import androidx.glance.GlanceId
+import androidx.glance.action.clickable
 import androidx.glance.action.ActionParameters
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
@@ -23,11 +24,16 @@ abstract class PrayerWidget(val kind: WidgetKind) : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val deps = widgetDeps(context)
+        com.kamalahmed.prayerapp.core.safety.guard("PrayerWidget","seed counters") { deps.nafl().ensureDefaults() }
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
         // The layout kind comes from the instance's real provider (receiver), not from this object, so an
         // update routed through the wrong GlanceAppWidget can never render another widget's layout.
         val kind = WidgetKinds.kindOf(context, appWidgetId) ?: kind
-        val initial = loadSnapshot(deps, appWidgetId, kind)
+        val initial = com.kamalahmed.prayerapp.core.safety.guard("PrayerWidget","load #$appWidgetId") { loadSnapshot(deps, appWidgetId, kind) }
+        if (initial == null) {
+            provideContent { androidx.glance.text.Text("Could not load widget. Open the app to retry.",modifier = androidx.glance.GlanceModifier.clickable(androidx.glance.action.actionStartActivity<com.kamalahmed.prayerapp.MainActivity>())) }
+            return
+        }
         // Root cause of "widget not live" (beta.6): data used to be loaded once, outside provideContent. While a
         // Glance session is alive (it stays up after every tap), update() only recomposes the running session and
         // never re-runs provideGlance, so the widget kept rendering the stale snapshot. Now the content observes the
@@ -52,6 +58,8 @@ class AllPrayersWidget : PrayerWidget(WidgetKind.ALL_WIDE)
 class NextStreakWidget : PrayerWidget(WidgetKind.NEXT_STREAK)
 class TrackerWidget : PrayerWidget(WidgetKind.TRACKER)
 class LargeWidget : PrayerWidget(WidgetKind.LARGE)
+class TasbihWidget : PrayerWidget(WidgetKind.TASBIH)
+class IqamahTableWidget : PrayerWidget(WidgetKind.IQAMAH_TABLE)
 class MinimalWidget : PrayerWidget(WidgetKind.MINIMAL)
 
 abstract class PrayerWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -76,6 +84,8 @@ class AllPrayersReceiver : PrayerWidgetReceiver() { override val glanceAppWidget
 class NextStreakReceiver : PrayerWidgetReceiver() { override val glanceAppWidget: GlanceAppWidget = NextStreakWidget() }
 class TrackerReceiver : PrayerWidgetReceiver() { override val glanceAppWidget: GlanceAppWidget = TrackerWidget() }
 class LargeReceiver : PrayerWidgetReceiver() { override val glanceAppWidget: GlanceAppWidget = LargeWidget() }
+class TasbihReceiver : PrayerWidgetReceiver() { override val glanceAppWidget: GlanceAppWidget = TasbihWidget() }
+class IqamahTableReceiver : PrayerWidgetReceiver() { override val glanceAppWidget: GlanceAppWidget = IqamahTableWidget() }
 class MinimalReceiver : PrayerWidgetReceiver() { override val glanceAppWidget: GlanceAppWidget = MinimalWidget() }
 
 /** Kind ↔ widget/receiver lookup. */
@@ -86,6 +96,8 @@ object WidgetKinds {
         WidgetKind.NEXT_STREAK -> NextStreakWidget()
         WidgetKind.TRACKER -> TrackerWidget()
         WidgetKind.LARGE -> LargeWidget()
+        WidgetKind.TASBIH -> TasbihWidget()
+        WidgetKind.IQAMAH_TABLE -> IqamahTableWidget()
         WidgetKind.MINIMAL -> MinimalWidget()
     }
 
@@ -95,6 +107,8 @@ object WidgetKinds {
         WidgetKind.NEXT_STREAK -> NextStreakReceiver::class.java
         WidgetKind.TRACKER -> TrackerReceiver::class.java
         WidgetKind.LARGE -> LargeReceiver::class.java
+        WidgetKind.TASBIH -> TasbihReceiver::class.java
+        WidgetKind.IQAMAH_TABLE -> IqamahTableReceiver::class.java
         WidgetKind.MINIMAL -> MinimalReceiver::class.java
     }
 
@@ -126,4 +140,19 @@ class ToggleAction : ActionCallback {
         val KeyPrayer = ActionParameters.Key<String>("prayer")
         val KeyDate = ActionParameters.Key<String>("date")
     }
+}
+
+/** Uses persisted instance selection (not a stale render date/item), never opens an Activity. */
+class TasbihAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        com.kamalahmed.prayerapp.core.safety.guard("TasbihAction", "count") {
+            val id = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
+            if (WidgetKinds.kindOf(context,id) != WidgetKind.TASBIH) return@guard
+            val deps = widgetDeps(context)
+            val item = deps.styles().get(id,WidgetKind.TASBIH).counterId
+            deps.nafl().adjustCounter(item, (parameters[Delta] ?: 1).coerceIn(-1,1))
+            WidgetUpdater.updateAll(context)
+        }
+    }
+    companion object { val Delta = ActionParameters.Key<Int>("delta") }
 }

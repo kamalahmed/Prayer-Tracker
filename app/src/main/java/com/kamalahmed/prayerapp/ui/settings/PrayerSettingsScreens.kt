@@ -218,24 +218,28 @@ fun TimeSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
 @Composable
 fun IqamaScreen(vm: SettingsViewModel, onBack: () -> Unit) {
     val s = vm.settings.collectAsStateWithLifecycle().value ?: return
-    SubScreen("Iqama", onBack) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
-            CardGroup {
-                SwitchRow("Show iqama times", s.iqamaEnabled, subtitle = "Minutes after the adhan") { v -> vm.update { it.copy(iqamaEnabled = v) } }
-            }
-            if (s.iqamaEnabled) {
-                SectionHeader("Minutes after adhan")
-                CardGroup {
-                    Prayer.obligatory.forEachIndexed { i, p ->
-                        if (i > 0) RowDivider()
-                        val v = s.iqama(p)
-                        StepperRow(p.displayName, "$v min",
-                            onMinus = { vm.update { it.copy(iqamaMinutes = it.iqamaMinutes + (p to (v - 1).coerceAtLeast(0))) } },
-                            onPlus = { vm.update { it.copy(iqamaMinutes = it.iqamaMinutes + (p to (v + 1).coerceAtMost(90))) } })
-                    }
-                }
-            }
+    val ctx = LocalContext.current
+    var pending by remember { mutableStateOf<Prayer?>(null) }
+    var fridayPending by remember { mutableStateOf(false) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val prayer = pending
+        val friday = fridayPending // Snapshot before resetting state; the ViewModel update is asynchronous.
+        if (granted) vm.update { old -> if (friday) old.copy(jumuahNotify = true) else old.copy(iqamaNotifications = old.iqamaNotifications + listOfNotNull(prayer)) }
+        else vm.message.value = "Notifications are not allowed; the iqamah reminder remains off."
+        pending = null; fridayPending = false
+    }
+    fun notify(prayer: Prayer?, on: Boolean) {
+        if (on && android.os.Build.VERSION.SDK_INT >= 33 && androidx.core.content.ContextCompat.checkSelfPermission(ctx,Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            pending = prayer; fridayPending = prayer == null
+            com.kamalahmed.prayerapp.core.safety.guard("Iqamah","notification permission") { permission.launch(Manifest.permission.POST_NOTIFICATIONS) }
+        } else vm.update { old ->
+            if (prayer == null) old.copy(jumuahNotify = on)
+            else old.copy(iqamaNotifications = if (on) old.iqamaNotifications + prayer else old.iqamaNotifications - prayer)
         }
+    }
+    Messages(vm)
+    SubScreen("Iqamah",onBack) {
+        IqamahSettingsContent(s,{ change -> vm.update(change) },::notify)
     }
 }
 

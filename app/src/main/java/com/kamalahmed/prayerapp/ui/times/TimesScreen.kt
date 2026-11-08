@@ -101,7 +101,7 @@ fun TimesScreen(
                         Text(TimeFormat.time(s.day[p], use24), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (s.settings.iqamaEnabled && p.isPrayer) {
                             Text(
-                                "Iqama " + TimeFormat.time(s.day[p].plusMinutes(s.settings.iqama(p).toLong()), use24),
+                                "Iqamah " + (com.kamalahmed.prayerapp.alarm.Iqamah.time(s.settings,p,s.day[p])?.let { TimeFormat.time(it,use24) } ?: "—"),
                                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
                             )
                         }

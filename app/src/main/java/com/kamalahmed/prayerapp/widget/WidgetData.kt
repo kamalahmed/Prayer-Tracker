@@ -22,6 +22,7 @@ data class WidgetRow(
     val icon: Int,
     val isNext: Boolean,
     val passed: Boolean,
+    val iqamah: ZonedDateTime? = null,
 )
 
 /** Everything a widget needs, computed once per update. */
@@ -44,6 +45,10 @@ data class WidgetData(
     val bestDays: Int,
     val appUse24h: Boolean,
     val appAbbr: Boolean,
+    val counterItems: List<com.kamalahmed.prayerapp.nafl.NaflItem> = emptyList(),
+    val counterLogs: List<com.kamalahmed.prayerapp.nafl.NaflLog> = emptyList(),
+    val todayIqamah: Map<Prayer, ZonedDateTime> = emptyMap(),
+    val iqamahEvents: List<PrayerEvent> = emptyList(),
 ) {
     val prayedToday: Int get() = Prayer.obligatory.count { StreakCalculator.prayed(todayStatus[it]) }
 
@@ -57,6 +62,8 @@ data class WidgetData(
     /** Earliest moment after [now] at which the widget content changes on its own. */
     val nextBoundary: ZonedDateTime get() = listOfNotNull(
         rows.map { it.time }.firstOrNull { it.isAfter(now) },
+        iqamahEvents.firstOrNull { it.time > now }?.time,
+        now.withZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDate().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).withZoneSameInstant(now.zone),
         next.time,
         midnight.time.takeIf { it.isAfter(now) },
         today.plusDays(1).atStartOfDay(now.zone),
@@ -82,7 +89,7 @@ data class WidgetData(
             val listDate = if (zNow.isBefore(todayDay[Prayer.ISHA])) today else today.plusDays(1)
             val day = schedule.day(listDate)
             val rows = day.times.entries.sortedBy { it.value }.map { (p, t) ->
-                WidgetRow(p, p.displayName, p.abbr, t, icon(p), isNext = p == next.prayer && t == next.time, passed = !t.isAfter(zNow))
+                WidgetRow(p, p.displayName, p.abbr, t, icon(p), isNext = p == next.prayer && t == next.time, passed = !t.isAfter(zNow), iqamah = com.kamalahmed.prayerapp.alarm.Iqamah.time(s,p,t))
             }
             // Midnight belonging to the night we are in / approaching.
             val yMid = schedule.day(today.minusDays(1)).midnight
@@ -107,6 +114,11 @@ data class WidgetData(
                 bestDays = stats.bestDays,
                 appUse24h = s.use24h,
                 appAbbr = s.abbreviations,
+                todayIqamah = Prayer.obligatory.mapNotNull { p -> com.kamalahmed.prayerapp.alarm.Iqamah.time(s,p,todayDay[p])?.let { p to it } }.toMap(),
+                iqamahEvents = (-1L..2L).flatMap { offset ->
+                    val dayTimes = schedule.day(today.plusDays(offset))
+                    Prayer.obligatory.mapNotNull { p -> com.kamalahmed.prayerapp.alarm.Iqamah.time(s,p,dayTimes[p])?.let { PrayerEvent(p,it) } }
+                }.sortedBy { it.time },
             )
         }
     }

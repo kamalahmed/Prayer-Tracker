@@ -22,16 +22,17 @@ object WidgetLive {
 
     /**
      * Emits a fresh snapshot whenever tracker rows, settings or [ticks] change. The first combined emission is
-     * dropped because the caller already rendered an initial snapshot. Errors keep the last good snapshot.
+     * optionally dropped for existing callers. Widget sessions reload the first emission too, closing the
+     * initial-snapshot/subscription race. Errors keep the last good snapshot.
      */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    fun <T> changes(tracker: Flow<Any?>, settings: Flow<Any?>, ticks: Flow<Long>, load: suspend () -> T): Flow<T> =
+    fun <T> changes(tracker: Flow<Any?>, settings: Flow<Any?>, ticks: Flow<Long>, skipInitial: Boolean = true, load: suspend () -> T): Flow<T> =
         combine(tracker, settings, ticks) { a, b, c -> Triple(a, b, c) }
             .distinctUntilChanged()
-            .drop(1)
+            .let { if (skipInitial) it.drop(1) else it }
             .mapLatest { load() }
             .catch { Log.w("WidgetLive", "live update failed", it) }
 
     fun snapshots(deps: WidgetEntryPoint, appWidgetId: Int, kind: WidgetKind, load: suspend () -> WidgetSnapshot): Flow<WidgetSnapshot> =
-        changes(deps.tracker().all, deps.settings().settings, ticks, load)
+        changes(combine(deps.tracker().all, deps.nafl().items, deps.nafl().logs) { t, i, l -> Triple(t,i,l) }, deps.settings().settings, ticks, skipInitial = false, load = load)
 }

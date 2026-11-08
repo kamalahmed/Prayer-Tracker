@@ -9,7 +9,11 @@ enum class WidgetKind(val label: String, val description: String) {
     TRACKER("Streak tracker", "4×1 · tap a prayer to mark it prayed"),
     LARGE("Dashboard", "4×4 · ring, all prayers, hijri date and streak"),
     MINIMAL("Minimal text", "Text only · next prayer on one line"),
+    TASBIH("Tasbih counter", "2×2 · tap to count a selected daily worship"),
+    IQAMAH_TABLE("Adhan + Iqamah", "4×3 · all prayers with both time columns"),
 }
+
+enum class WidgetTimeMode(val label: String) { START("Start time"), IQAMAH("Iqamah time"), BOTH("Both") }
 
 enum class WidgetTheme(val label: String) { GLASS("Glass"), SOLID("Solid"), MINIMAL("Minimal"), GRADIENT("Gradient"), LIGHT("Light") }
 
@@ -62,6 +66,8 @@ data class WidgetStyle(
     val abbreviations: Tri = Tri.APP,
     /** "Always show all prayers": never switch to the compact layout, whatever size the launcher reports. */
     val alwaysFull: Boolean = false,
+    val timeMode: WidgetTimeMode = WidgetTimeMode.START,
+    val counterId: String = "istighfar",
 ) {
     fun use24h(app: Boolean) = when (clock24) { Tri.APP -> app; Tri.ON -> true; Tri.OFF -> false }
     fun abbr(app: Boolean) = when (abbreviations) { Tri.APP -> app; Tri.ON -> true; Tri.OFF -> false }
@@ -72,11 +78,12 @@ data class WidgetStyle(
         "text" to fmt(textScale), "icon" to fmt(iconScale), "box" to fmt(boxScale), "weight" to weight.name,
         "hijri" to b(showHijri), "countdown" to b(showCountdown), "icons" to b(showIcons), "ampm" to b(showAmPm),
         "sunrise" to b(showSunrise), "midnight" to b(showMidnight), "clock" to clock24.name, "abbr" to abbreviations.name,
-        "full" to b(alwaysFull),
+        "full" to b(alwaysFull), "times" to timeMode.name, "counter" to counterId,
     ).joinToString(";") { "${it.first}=${it.second}" }
 
     /** Values clamped into their valid ranges. */
     fun sanitized() = copy(
+        counterId = counterId.take(80).filter { it.isLetterOrDigit() || it == '_' || it == '-' },
         opacity = opacity.coerceIn(0, 100), corner = corner.coerceIn(0, 40), padV = padV.coerceIn(0, 32), padH = padH.coerceIn(0, 32),
         spacing = spacing.coerceIn(0, 24), textScale = textScale.coerceIn(0.6f, 1.8f),
         iconScale = iconScale.coerceIn(0.5f, 1.8f), boxScale = boxScale.coerceIn(0.6f, 1.5f),
@@ -92,6 +99,8 @@ data class WidgetStyle(
             WidgetKind.NEXT_STREAK -> WidgetStyle()
             WidgetKind.TRACKER -> WidgetStyle(abbreviations = Tri.ON, showAmPm = false)
             WidgetKind.LARGE -> WidgetStyle(theme = WidgetTheme.SOLID, opacity = 92, showSunrise = true)
+            WidgetKind.TASBIH -> WidgetStyle(theme = WidgetTheme.SOLID)
+            WidgetKind.IQAMAH_TABLE -> WidgetStyle(theme = WidgetTheme.SOLID, timeMode = WidgetTimeMode.BOTH)
             WidgetKind.MINIMAL -> WidgetStyle(theme = WidgetTheme.MINIMAL, opacity = 0, padV = 4, padH = 4, showIcons = false)
         }
 
@@ -126,6 +135,8 @@ data class WidgetStyle(
                 clock24 = Tri.entries.firstOrNull { it.name == m["clock"] } ?: d.clock24,
                 abbreviations = Tri.entries.firstOrNull { it.name == m["abbr"] } ?: d.abbreviations,
                 alwaysFull = bool("full", d.alwaysFull),
+                timeMode = WidgetTimeMode.entries.firstOrNull { it.name == m["times"] } ?: d.timeMode,
+                counterId = m["counter"] ?: d.counterId,
             ).sanitized()
         }
     }
@@ -222,7 +233,7 @@ object WidgetLayout {
     fun cellCount(kind: WidgetKind, enabledRows: Int): Int = when (kind) {
         WidgetKind.ALL_WIDE -> enabledRows.coerceAtMost(8)
         WidgetKind.NEXT_STREAK, WidgetKind.TRACKER -> 5
-        WidgetKind.LARGE -> enabledRows
-        WidgetKind.NEXT_SMALL, WidgetKind.MINIMAL -> 0
+        WidgetKind.LARGE, WidgetKind.IQAMAH_TABLE -> enabledRows
+        WidgetKind.NEXT_SMALL, WidgetKind.MINIMAL, WidgetKind.TASBIH -> 0
     }
 }

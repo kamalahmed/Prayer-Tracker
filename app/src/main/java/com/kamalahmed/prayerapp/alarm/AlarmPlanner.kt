@@ -6,7 +6,7 @@ import com.kamalahmed.prayerapp.core.prayer.PrayerSchedule
 import com.kamalahmed.prayerapp.data.settings.AppSettings
 import java.time.ZonedDateTime
 
-enum class AlarmType(val code: Int) { PRAYER(0), REMINDER(1), IQAMA(2), SNOOZE(3) }
+enum class AlarmType(val code: Int) { PRAYER(0), REMINDER(1), IQAMA(2), SNOOZE(3), IQAMA_NOTICE(4) }
 
 data class PlannedAlarm(val type: AlarmType, val prayer: Prayer, val at: ZonedDateTime, val prayerTime: ZonedDateTime) {
     val requestCode: Int get() = prayer.ordinal * 10 + type.code
@@ -28,10 +28,17 @@ object AlarmPlanner {
                     ?.let { out += PlannedAlarm(AlarmType.REMINDER, p, it.first, it.second) }
             }
             if (s.iqamaEnabled && p.isPrayer && s.iqama(p) > 0) {
-                events.map { it.time.plusMinutes(s.iqama(p).toLong()) to it.time }
+                events.mapNotNull { e -> Iqamah.time(s,p,e.time)?.let { it to e.time } }
                     .firstOrNull { it.first.isAfter(now) }
                     ?.let { out += PlannedAlarm(AlarmType.IQAMA, p, it.first, it.second) }
             }
+        }
+        // Separate from adhan sound modes; look ahead a full week for an optional Friday-only notice.
+        Prayer.obligatory.forEach { p ->
+            (-1L..8L).map { offset -> schedule.day(now.toLocalDate().plusDays(offset))[p] }
+                .filter { Iqamah.enabled(s,p,it) }
+                .mapNotNull { adhan -> Iqamah.time(s,p,adhan)?.minusMinutes(Iqamah.lead(s,p,adhan).toLong())?.let { it to adhan } }
+                .firstOrNull { it.first > now }?.let { out += PlannedAlarm(AlarmType.IQAMA_NOTICE,p,it.first,it.second) }
         }
         return out.sortedBy { it.at }
     }

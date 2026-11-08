@@ -30,6 +30,7 @@ class PrayerApp : Application(), Configuration.Provider {
     @Inject lateinit var updatePrefs: com.kamalahmed.prayerapp.update.UpdatePrefs
     @Inject lateinit var tracker: com.kamalahmed.prayerapp.tracker.TrackerRepository
 
+    @Inject lateinit var nafl: com.kamalahmed.prayerapp.nafl.NaflRepository
     @Inject lateinit var quranReminders: com.kamalahmed.prayerapp.nafl.QuranReminders
 
     val appScope = com.kamalahmed.prayerapp.core.safety.safeScope("PrayerApp")
@@ -58,6 +59,11 @@ class PrayerApp : Application(), Configuration.Provider {
         // Marking prayers in the app updates the streak widgets.
         appScope.launch {
             tracker.changes.debounce(300).collect { guard(TAG, "widgets") { com.kamalahmed.prayerapp.widget.WidgetUpdater.updateAll(this@PrayerApp) } }
+        }
+        appScope.launch {
+            kotlinx.coroutines.flow.combine(nafl.items,nafl.logs) { i,l -> i to l }.debounce(300).collect {
+                guard(TAG,"counter widgets") { com.kamalahmed.prayerapp.widget.WidgetUpdater.updateAll(this@PrayerApp) }
+            }
         }
         guard(TAG, "widget schedule") { com.kamalahmed.prayerapp.widget.WidgetUpdater.ensureScheduled(this) }
     }

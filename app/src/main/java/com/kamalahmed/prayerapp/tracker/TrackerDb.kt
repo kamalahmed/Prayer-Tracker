@@ -53,7 +53,7 @@ interface PrayerLogDao {
 
 @Database(
     entities = [PrayerLog::class, com.kamalahmed.prayerapp.qada.QadaDebt::class, com.kamalahmed.prayerapp.qada.QadaEntry::class, com.kamalahmed.prayerapp.qada.QadaConfig::class, com.kamalahmed.prayerapp.nafl.NaflItem::class, com.kamalahmed.prayerapp.nafl.NaflLog::class, com.kamalahmed.prayerapp.nafl.QuranReminder::class],
-    version = 3, exportSchema = true,
+    version = 4, exportSchema = true,
 )
 abstract class TrackerDatabase : RoomDatabase() {
     abstract fun dao(): PrayerLogDao
@@ -78,7 +78,14 @@ abstract class TrackerDatabase : RoomDatabase() {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `quran_reminder` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `minute` INTEGER NOT NULL, `enabled` INTEGER NOT NULL, `alarmSound` INTEGER NOT NULL)")
             }
         }
-        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `nafl_item` ADD COLUMN `type` TEXT NOT NULL DEFAULT 'CHECKBOX'")
+                db.execSQL("ALTER TABLE `nafl_item` ADD COLUMN `dailyTarget` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE `nafl_item` SET `type` = 'COUNTER' WHERE id = 'dhikr'")
+            }
+        }
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
     }
 }
 

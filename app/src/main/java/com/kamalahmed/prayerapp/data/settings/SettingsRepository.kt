@@ -46,6 +46,15 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val countUp = intPreferencesKey("count_up_min")
         val iqamaOn = booleanPreferencesKey("iqama_enabled")
         fun iqama(p: Prayer) = intPreferencesKey("iqama_${p.name}")
+        fun iqFixed(p: Prayer) = intPreferencesKey("iq_fixed_${p.name}")
+        fun iqNotify(p: Prayer) = booleanPreferencesKey("iq_notify_${p.name}")
+        fun iqBefore(p: Prayer) = intPreferencesKey("iq_before_${p.name}")
+        val jumOn = booleanPreferencesKey("jumuah_on")
+        val jumFixed = booleanPreferencesKey("jumuah_fixed")
+        val jumOffset = intPreferencesKey("jumuah_offset")
+        val jumTime = intPreferencesKey("jumuah_time")
+        val jumNotify = booleanPreferencesKey("jumuah_notify")
+        val jumBefore = intPreferencesKey("jumuah_before")
         fun mode(p: Prayer) = stringPreferencesKey("mode_${p.name}")
         val soundSource = stringPreferencesKey("sound_source")
         val bundled = stringPreferencesKey("bundled_sound")
@@ -106,6 +115,15 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             countUpMinutes = this[K.countUp] ?: d.countUpMinutes,
             iqamaEnabled = this[K.iqamaOn] ?: d.iqamaEnabled,
             iqamaMinutes = Prayer.obligatory.associateWith { this[K.iqama(it)] ?: d.iqama(it) },
+            iqamaFixed = Prayer.obligatory.mapNotNull { p -> this[K.iqFixed(p)]?.takeIf { it in 0..1439 }?.let { p to it } }.toMap(),
+            iqamaNotifications = Prayer.obligatory.filter { this[K.iqNotify(it)] == true }.toSet(),
+            iqamaBefore = Prayer.obligatory.associateWith { (this[K.iqBefore(it)] ?: 0).coerceIn(0, 180) },
+            jumuahEnabled = this[K.jumOn] ?: false,
+            jumuahFixed = this[K.jumFixed] ?: true,
+            jumuahOffset = (this[K.jumOffset] ?: 20).coerceIn(0,180),
+            jumuahMinute = (this[K.jumTime] ?: d.jumuahMinute).coerceIn(0, 1439),
+            jumuahNotify = this[K.jumNotify] ?: false,
+            jumuahBefore = (this[K.jumBefore] ?: 0).coerceIn(0, 180),
             notifyModes = Prayer.entries.associateWith { this[K.mode(it)].toEnum(d.mode(it)) },
             soundSource = this[K.soundSource].toEnum(d.soundSource),
             bundledSound = this[K.bundled] ?: d.bundledSound,
@@ -143,6 +161,17 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         this[K.countUp] = s.countUpMinutes
         this[K.iqamaOn] = s.iqamaEnabled
         Prayer.obligatory.forEach { this[K.iqama(it)] = s.iqama(it) }
+        Prayer.obligatory.forEach { p ->
+            s.iqamaFixed[p]?.let { this[K.iqFixed(p)] = it.coerceIn(0,1439) } ?: remove(K.iqFixed(p))
+            this[K.iqNotify(p)] = p in s.iqamaNotifications
+            this[K.iqBefore(p)] = (s.iqamaBefore[p] ?: 0).coerceIn(0,180)
+        }
+        this[K.jumOn] = s.jumuahEnabled
+        this[K.jumFixed] = s.jumuahFixed
+        this[K.jumOffset] = s.jumuahOffset.coerceIn(0,180)
+        this[K.jumTime] = s.jumuahMinute.coerceIn(0,1439)
+        this[K.jumNotify] = s.jumuahNotify
+        this[K.jumBefore] = s.jumuahBefore.coerceIn(0,180)
         Prayer.entries.forEach { this[K.mode(it)] = s.mode(it).name }
         this[K.soundSource] = s.soundSource.name
         this[K.bundled] = s.bundledSound

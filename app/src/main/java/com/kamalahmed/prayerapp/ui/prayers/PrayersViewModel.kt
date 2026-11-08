@@ -53,7 +53,7 @@ class PrayersViewModel @Inject constructor(
         val hijri = HijriCalendar.at(now, today[Prayer.MAGHRIB], s.hijriAdjust, s.autoIncrementHijri)
         val countUp = elapsed.takeIf { s.countUpMinutes > 0 && it.toMinutes() < s.countUpMinutes }
         val iqama = if (s.iqamaEnabled) {
-            val end = prev.time.plusMinutes(s.iqama(prev.prayer).toLong())
+            val end = com.kamalahmed.prayerapp.alarm.Iqamah.time(s,prev.prayer,prev.time) ?: prev.time
             Duration.between(now, end).takeIf { !it.isNegative && !it.isZero }
         } else null
         PrayersUiState(

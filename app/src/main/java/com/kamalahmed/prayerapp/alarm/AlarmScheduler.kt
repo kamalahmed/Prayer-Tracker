@@ -32,7 +32,7 @@ class AlarmScheduler @Inject constructor(
         val now = ZonedDateTime.now(params.zone)
         val plan = AlarmPlanner.plan(s, PrayerSchedule(params), now)
         // cancel everything we may have scheduled before (except snoozes)
-        for (p in Prayer.entries) for (t in listOf(AlarmType.PRAYER, AlarmType.REMINDER, AlarmType.IQAMA)) {
+        for (p in Prayer.entries) for (t in listOf(AlarmType.PRAYER, AlarmType.REMINDER, AlarmType.IQAMA, AlarmType.IQAMA_NOTICE)) {
             pending(t, p, null, 0L, PendingIntent.FLAG_NO_CREATE)?.let { am.cancel(it); it.cancel() }
         }
         plan.forEach { set(it, useAlarmClock = it.type == AlarmType.PRAYER && s.mode(it.prayer) == NotifyMode.ADHAN) }

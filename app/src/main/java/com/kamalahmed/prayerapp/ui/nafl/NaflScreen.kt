@@ -53,7 +53,7 @@ fun NaflScreen(vm: NaflViewModel = hiltViewModel()) {
         }
         return
     }
-    NaflContent(s, vm::log, vm::item, vm::add, vm::reminder, vm::removeReminder, vm::period, vm::shift, vm::day)
+    NaflContent(s, vm::log, vm::item, vm::add, vm::reminder, vm::removeReminder, vm::period, vm::shift, vm::day, vm::addTyped)
 }
 
 /** Stateless dashboard boundary so every editor and layout can be exercised without Hilt. */
@@ -68,6 +68,7 @@ fun NaflContent(
     onPeriod: (StatsPeriod) -> Unit = {},
     onShift: (Long) -> Unit = {},
     onDay: (LocalDate) -> Unit = {},
+    onAddTyped: (String,String,Int) -> Unit = { name, _, _ -> onAdd(name) },
 ) {
     var editingLog by remember { mutableStateOf<NaflItem?>(null) }
     var customize by rememberSaveable { mutableStateOf(false) }
@@ -105,8 +106,8 @@ fun NaflContent(
         }
         return
     }
-    if (adding || editItem != null) { NameEditor(editItem?.name.orEmpty(), { adding = false; editItem = null }) { name ->
-        editItem?.let { onItem(it.copy(name = name)) } ?: onAdd(name)
+    if (adding || editItem != null) { NameEditor(editItem, { adding = false; editItem = null }) { name, type, target ->
+        editItem?.let { onItem(it.copy(name = name, type = type, dailyTarget = target)) } ?: onAddTyped(name,type,target)
         adding = false; editItem = null
     }; return
     }
@@ -155,7 +156,7 @@ fun NaflContent(
                 }
                 Text("Optional slots never increase the 12-rakaat total. Witr and other practices vary; customize to suit yours.", style = MaterialTheme.typography.bodySmall)
             } },
-            { Panel("Other worship", "Check off a deed, or tap Edit to add a count. Quran pages and minutes are optional.") {
+            { Panel("Other worship", "Check off a deed. Count opens today’s tasbih; Edit can backfill counts. Quran pages and minutes are optional.") {
                 s.items.filter { it.group != "SUNNAH" && it.enabled }.forEach { item ->
                     val log = dayLogs[item.id]
                     WorshipRow(item, log, { onLog(item, if ((log?.count ?: 0) > 0) 0 else 1, log?.pages ?: 0, log?.minutes ?: 0) }, { editingLog = item })
@@ -164,6 +165,7 @@ fun NaflContent(
             } },
             { PeriodPanel(s, onPeriod, onShift) },
             { ActivityCharts(s) },
+            { CounterCharts(s) },
             { Panel("Per-item progress", "Selected period · completed days / tracked days. Streaks are current, not period-limited.") {
                 s.report.items.forEach { row ->
                     Text(row.item.name + if (!row.item.enabled) " (hidden)" else "", fontWeight = FontWeight.SemiBold)
@@ -210,12 +212,16 @@ fun NaflContent(
 @Composable
 private fun WorshipRow(item: NaflItem, log: NaflLog?, toggle: () -> Unit, edit: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = (log?.count ?: 0) > 0, onCheckedChange = { toggle() }, modifier = Modifier.semantics { contentDescription = "Mark ${item.name}" })
-        Column(Modifier.weight(1f).clickable(onClick = toggle).padding(vertical = 8.dp)) {
+        val context = LocalContext.current
+        val openCounter: () -> Unit = { guard("Nafl", "open counter") { context.startActivity(Intent(context,TasbihActivity::class.java).putExtra("counterId",item.id)) } }
+        if (item.isCounter) TextButton(onClick = openCounter) { Text("Count") }
+        else Checkbox(checked = (log?.count ?: 0) > 0, onCheckedChange = { toggle() }, modifier = Modifier.semantics { contentDescription = "Mark ${item.name}" })
+        Column(Modifier.weight(1f).clickable(onClick = if (item.isCounter) openCounter else toggle).padding(vertical = 8.dp)) {
             Text(item.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(when {
                 item.rakaat > 0 -> "${item.rakaat} rakaat" + if (item.baseline) " · daily Sunnah" else " · optional slot"
                 item.id == "quran" -> "${log?.pages ?: 0} pages · ${log?.minutes ?: 0} min"
+                item.isCounter -> "${log?.count ?: 0}" + if (item.dailyTarget > 0) " / ${item.dailyTarget} daily target" else " counted"
                 else -> "${log?.count ?: 0} logged"
             }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -259,12 +265,12 @@ private fun LogEditor(item: NaflItem, log: NaflLog?, dismiss: () -> Unit, save: 
     var count by rememberSaveable { mutableStateOf((log?.count ?: 0).toString()) }
     var pages by rememberSaveable { mutableStateOf((log?.pages ?: 0).toString()) }
     var minutes by rememberSaveable { mutableStateOf((log?.minutes ?: 0).toString()) }
-    val valid = count.toIntOrNull() in 0..(if (checkboxOnly) 1 else 10000) && pages.ifBlank { "0" }.toIntOrNull() in 0..10000 && minutes.ifBlank { "0" }.toIntOrNull() in 0..1440
+    val valid = count.toIntOrNull() in 0..(if (checkboxOnly) 1 else if (item.isCounter) 1_000_000 else 10000) && pages.ifBlank { "0" }.toIntOrNull() in 0..10000 && minutes.ifBlank { "0" }.toIntOrNull() in 0..1440
     EditorPage(item.name, dismiss, { save(count.toIntOrNull() ?: 0, pages.ifBlank { "0" }.toIntOrNull() ?: 0, minutes.ifBlank { "0" }.toIntOrNull() ?: 0) }, valid) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (checkboxOnly) Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = count == "1", onCheckedChange = { count = if (it) "1" else "0" }); Text("Completed")
-            } else NumberField("Count (0–10000)", count, { count = it })
+            } else NumberField(if (item.isCounter) "Count (0–1000000)" else "Count (0–10000)", count, { count = it })
             if (item.id == "quran") {
                 NumberField("Pages (optional)", pages, { pages = it })
                 NumberField("Minutes (optional)", minutes, { minutes = it })
@@ -277,38 +283,55 @@ private fun LogEditor(item: NaflItem, log: NaflLog?, dismiss: () -> Unit, save: 
 
 @Composable
 private fun NumberField(label: String, value: String, change: (String) -> Unit) {
-    OutlinedTextField(value, { if (it.length <= 5) change(it) }, label = { Text(label) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(value, { if (it.length <= 7) change(it) }, label = { Text(label) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
-private fun NameEditor(initial: String, dismiss: () -> Unit, save: (String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf(initial) }
-    EditorPage(if (initial.isEmpty()) "Add custom item" else "Rename item", dismiss, { save(name.trim()) }, name.isNotBlank()) {
+private fun NameEditor(initial: NaflItem?, dismiss: () -> Unit, save: (String,String,Int) -> Unit) {
+    var name by rememberSaveable { mutableStateOf(initial?.name.orEmpty()) }
+    var counter by rememberSaveable { mutableStateOf(initial?.isCounter ?: false) }
+    var target by rememberSaveable { mutableStateOf((initial?.dailyTarget ?: 0).takeIf { it > 0 }?.toString().orEmpty()) }
+    val valid = name.isNotBlank() && (!counter || target.ifBlank { "0" }.toIntOrNull() in 0..1_000_000)
+    EditorPage(if (initial == null) "Add custom item" else "Rename item", dismiss,
+        { save(name.trim(),if (counter) "COUNTER" else "CHECKBOX", if (counter) target.toIntOrNull() ?: 0 else 0) },valid) {
         OutlinedTextField(name, { if (it.length <= 60) name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        if (initial == null || (initial.rakaat == 0 && initial.id != "quran")) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(checked = counter,onCheckedChange = { counter = it }); Text("Counter item")
+            }
+            Text(if (counter) "Tap counter · counts persist each day" else "Daily checkbox / manual count",style = MaterialTheme.typography.bodySmall)
+        }
+        if (counter) NumberField("Daily target (optional)",target,{ target = it })
+        Text("Changing type or target keeps all previous counts.",style = MaterialTheme.typography.bodySmall)
     }
 }
 
 @Composable
 private fun ReminderEditor(initial: QuranReminder, dismiss: () -> Unit, save: (QuranReminder) -> Unit) {
-    var hour by rememberSaveable { mutableStateOf((initial.minute / 60).toString()) }
+    var hour by rememberSaveable { mutableStateOf(((initial.minute / 60 % 12).let { if (it == 0) 12 else it }).toString()) }
     var minute by rememberSaveable { mutableStateOf((initial.minute % 60).toString()) }
+    var pm by rememberSaveable { mutableStateOf(initial.minute >= 720) }
     var sound by rememberSaveable { mutableStateOf(initial.alarmSound) }
     var enabled by rememberSaveable { mutableStateOf(initial.enabled) }
-    val valid = hour.toIntOrNull() in 0..23 && minute.toIntOrNull() in 0..59
-    EditorPage("Quran reading reminder", dismiss, { save(initial.copy(minute = (hour.toIntOrNull() ?: 0) * 60 + (minute.toIntOrNull() ?: 0), enabled = enabled, alarmSound = sound)) }, valid) {
+    val valid = hour.toIntOrNull() in 1..12 && minute.toIntOrNull() in 0..59
+    EditorPage("Quran reading reminder", dismiss, { save(initial.copy(minute = Clock12.minute(hour.toIntOrNull() ?: 12,minute.toIntOrNull() ?: 0,pm), enabled = enabled, alarmSound = sound)) }, valid) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Daily time (24-hour clock). Reminders start off.")
-            NumberField("Hour (0–23)", hour, { hour = it })
+            Text("Daily time (12-hour clock). Reminders start off.")
+            NumberField("Hour (1–12)", hour, { hour = it })
             NumberField("Minute (0–59)", minute, { minute = it })
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !pm,onClick = { pm = false },label = { Text("AM") })
+                FilterChip(selected = pm,onClick = { pm = true },label = { Text("PM") })
+            }
             Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = enabled, onCheckedChange = { enabled = it }); Text("Enable reminder") }
             Row(verticalAlignment = Alignment.CenterVertically) { Switch(checked = sound, onCheckedChange = { sound = it }); Text("Use alarm sound") }
             Text("Sound uses the Android default alarm tone once. Manage volume and channels in Notification settings.", style = MaterialTheme.typography.bodySmall)
-            if (!valid) Text("Enter an hour from 0 to 23 and minute from 0 to 59.", color = Danger)
+            if (!valid) Text("Enter an hour from 1 to 12 and minute from 0 to 59.", color = Danger)
         }
     }
 }
 
-private fun timeLabel(minute: Int): String = "%02d:%02d".format(java.util.Locale.getDefault(), minute.coerceIn(0, 1439) / 60, minute.coerceIn(0, 1439) % 60)
+private fun timeLabel(minute: Int): String = Clock12.label(minute)
 
 /** Full-page editors keep forms usable with large fonts, split-screen and an open keyboard. */
 @Composable
@@ -321,5 +344,28 @@ private fun EditorPage(title: String, dismiss: () -> Unit, save: () -> Unit, val
             OutlinedButton(onClick = dismiss) { Text("Cancel") }
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun CounterCharts(s: NaflUi) {
+    val counters = s.items.filter { it.isCounter }
+    if (counters.isEmpty()) return
+    var selected by rememberSaveable { mutableStateOf("istighfar") }
+    val item = counters.firstOrNull { it.id == selected } ?: counters.first()
+    val logs = s.logs.filter { it.itemId == item.id }.associateBy { it.date }
+    val days = s.report.daily.map { it.date to (logs[it.date.toString()]?.count ?: 0).coerceIn(0,1_000_000) }
+    Panel("Tasbih totals", "Daily counts · ${s.report.title}") {
+        Text("All counters in period: ${s.report.items.filter { it.item.isCounter }.sumOf { it.count.toLong() }}",fontWeight = FontWeight.Bold)
+        Text("Selected day: ${s.day} · ${logs[s.day.toString()]?.count ?: 0} ${item.name}")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            counters.forEach { c -> FilterChip(selected = c.id == item.id,onClick = { selected = c.id },label = { Text(c.name) }) }
+        }
+        Text("${item.name}: ${days.sumOf { it.second.toLong() }} in period",fontWeight = FontWeight.SemiBold)
+        val slots = if (s.period == StatsPeriod.YEAR) days.groupBy { it.first.month }.map { (month,rows) ->
+            val count = rows.sumOf { it.second }
+            BarSlot(month.name.take(1),listOf(count to AccentGreen),true,"${month.name}: $count ${item.name}")
+        } else days.map { (date,count) -> BarSlot(if (s.period == StatsPeriod.WEEK) date.dayOfWeek.name.take(2) else "${date.dayOfMonth}",listOf(count to AccentGreen),true,"$date: $count ${item.name}") }
+        StackedBarChart(slots)
     }
 }
