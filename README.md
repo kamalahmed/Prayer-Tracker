@@ -10,13 +10,14 @@ Defaults: Sharjah, UAE, using the Authority of Dubai calculation method.
 - Full-screen alarm notifications are optional and turned on in Settings.
 - **Streaks tab** (bottom navigation: Prayers · Times · Streaks · Qibla · Settings): current/best streak, today's tracker, and a Week / Month / Year statistics report with prev/next navigation. It shows prayed vs missed and on time vs late with completion %, a stacked bar chart with a completion trend line, a most-missed ranking with per-prayer on-time rate, the change vs the previous period, a calendar heatmap (tap any past day to backfill or edit it), streak history and insights. Tracking is backed by Room; mark prayers from the notification ("Prayed ✓"), a widget or the app. Unmarked prayers count as missed only once their time has passed, and only from the first tracked day.
 - **Qada (make-up prayers)** — Streaks tab › Qada: set your debt per prayer (optional Witr) or calculate it from years/months or a date range (with an optional days-per-month exclusion), log with +1 / +N / "+1 full day", undo, delete entries from the history, and see progress ring, per-prayer progress, days covered/remaining (1 day = 5 prayers), 30-day pace, estimated finish date, qada streak and weekly/monthly charts. Optional daily goal with a reminder (off by default).
+- **Nafl (optional worship)** — Streaks tab › Nafl: daily checkboxes for the 12 Sunnah rakaat (2 before Fajr, 4 before + 2 after Dhuhr, 2 after Maghrib, 2 after Isha), configurable optional Asr/Witr slots, Quran reading with optional pages/minutes, Tahajjud, tasbih/dhikr, ruqyah, Duha and up to 50 custom/renamable items. Backfill past days; browse week/month/year counts, per-slot completion rates, current streaks, Sunnah charts and a calendar heatmap. Hiding or renaming an item keeps its history. Up to 12 daily Quran reminders (off until enabled), notification-style or using the default alarm tone once; boot, update and time-zone changes re-arm them. These reminders are not continuous/full-screen adhan alarms.
 - **Qibla compass** works on phones without a gyroscope: rotation vector → geomagnetic rotation vector → accelerometer + magnetometer, with clear calibration / no-data / no-sensor states and a static bearing fallback.
 - **Tablets and foldables:** a navigation rail on wide screens, two-pane Prayers, Times and Qibla, a multi-column Streaks dashboard and Settings list-detail. Fold, unfold and rotation keep your state.
 - Six home-screen widgets: Next, Wide, Streak, Tracker, Large and Minimal. Each widget has its own style settings for theme, transparency (0 % = no background at all), vertical padding, horizontal padding, spacing between items, position in the cell (top/center/bottom), text/icon/box size and accent. The background panel wraps the content, so a tall cell no longer shows an empty tinted area. Row widgets can be 1 cell tall. "Always show full layout" keeps every prayer visible at small sizes. The countdown ticks live, and Widget Studio shows a live preview.
 - Onboarding walks through location, notifications, exact alarm, battery and full-screen permissions.
 
 ## Diagnostics
-If the app crashes, a local crash log is saved on the device. It is never uploaded. Open **Settings > App > Diagnostics** to view it or copy it. See `docs/REVIEW_beta5.md` for the hardening review.
+If the app crashes, a local crash log is saved on the device. It is never uploaded. Open **Settings > App > Diagnostics** to view it or copy it. See `docs/REVIEW_beta5.md` for the hardening review and `docs/REVIEW_beta7.md` for the Nafl/reminder self-review.
 
 ## Build
 Requirements: JDK 17 and the Android SDK (platform 36). Put the SDK path in `local.properties` (`sdk.dir=...`) or set `ANDROID_HOME`.
@@ -60,7 +61,7 @@ Keep the keystore backed up: every future update must be signed with the same ke
 cp app/build/outputs/apk/release/app-release.apk PrayerApp-v0.2.0-beta.1.apk
 sha256sum PrayerApp-v0.2.0-beta.1.apk > PrayerApp-v0.2.0-beta.1.apk.sha256
 ```
-Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) and attach the `.apk` and `.apk.sha256` files. Optionally add `versionCode: 3` to the notes. The tag name must be the versionName with a `v` prefix. Defaults when the properties are omitted: `0.1.0-beta.3` / `4`.
+Create a GitHub release tagged `v0.2.0-beta.1` (tick *pre-release* for betas) and attach the `.apk` and `.apk.sha256` files. Optionally add `versionCode: 3` to the notes. The tag name must be the versionName with a `v` prefix. Defaults when the properties are omitted: `0.1.0-beta.7` / `8`.
 
 ## Permissions
 | Permission | Why |

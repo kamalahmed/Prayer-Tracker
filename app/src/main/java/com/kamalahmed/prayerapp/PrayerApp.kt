@@ -30,6 +30,8 @@ class PrayerApp : Application(), Configuration.Provider {
     @Inject lateinit var updatePrefs: com.kamalahmed.prayerapp.update.UpdatePrefs
     @Inject lateinit var tracker: com.kamalahmed.prayerapp.tracker.TrackerRepository
 
+    @Inject lateinit var quranReminders: com.kamalahmed.prayerapp.nafl.QuranReminders
+
     val appScope = com.kamalahmed.prayerapp.core.safety.safeScope("PrayerApp")
 
     override val workManagerConfiguration: Configuration
@@ -44,6 +46,7 @@ class PrayerApp : Application(), Configuration.Provider {
         guard(TAG, "update channel") { com.kamalahmed.prayerapp.update.UpdateWorker.createChannel(this) }
         guard(TAG, "update worker") { com.kamalahmed.prayerapp.update.UpdateWorker.schedule(this, updatePrefs.autoCheck.value, updatePrefs.wifiOnly.value) }
         guard(TAG, "reschedule worker") { RescheduleWorker.enqueue(this) }
+        appScope.launch { guard(TAG, "Quran reminders") { quranReminders.reschedule() } }
         // Any settings change (method, location, modes, reminders…) re-arms alarms and refreshes widgets.
         appScope.launch {
             settings.settings.distinctUntilChanged().debounce(400).collect {

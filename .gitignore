@@ -19,3 +19,6 @@ keystore.properties
 signing.properties
 *signing*.properties
 secrets/
+
+# Kotlin compiler local session/cache state
+.kotlin/

@@ -245,7 +245,7 @@ fun heatColor(v: Int?, good: Color, bad: Color): Color = when {
  * Cells scale to the width; below a readable minimum the grid scrolls horizontally instead of shrinking.
  */
 @Composable
-fun ContributionGrid(cells: List<Pair<LocalDate, Int?>>, today: LocalDate, good: Color, bad: Color, onDay: (LocalDate) -> Unit, locale: Locale = Locale.getDefault()) {
+fun ContributionGrid(cells: List<Pair<LocalDate, Int?>>, today: LocalDate, good: Color, bad: Color, onDay: (LocalDate) -> Unit, locale: Locale = Locale.getDefault(), maxCount: Int = 5, unit: String = "prayed") {
     if (cells.isEmpty()) return
     val lead = cells.first().first.dayOfWeek.value - DayOfWeek.MONDAY.value
     val padded: List<Pair<LocalDate, Int?>?> = List(lead) { null } + cells
@@ -282,9 +282,9 @@ fun ContributionGrid(cells: List<Pair<LocalDate, Int?>>, today: LocalDate, good:
                             val c = week.getOrNull(i)
                             Box(
                                 Modifier.size(cell.dp).clip(RoundedCornerShape(3.dp))
-                                    .background(if (c == null) Color.Transparent else heatColor(c.second, good, bad))
+                                    .background(if (c == null) Color.Transparent else heatColor(c.second?.let { ((it * 5f / maxCount.coerceAtLeast(1))).toInt().coerceAtLeast(if (it > 0) 1 else 0) }, good, bad))
                                     .then(if (c != null && !c.first.isAfter(today)) Modifier.clickable { onDay(c.first) } else Modifier)
-                                    .semantics { if (c != null) contentDescription = "${c.first}: ${c.second?.let { "$it of 5 prayed" } ?: "no data"}" },
+                                    .semantics { if (c != null) contentDescription = "${c.first}: ${c.second?.let { "$it of $maxCount $unit" } ?: "no data"}" },
                             )
                         }
                     }

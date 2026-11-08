@@ -37,6 +37,7 @@ class SeedTrackerRule : TestRule {
             val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
             val db = Room.databaseBuilder(ctx, TrackerDatabase::class.java, "tracker.db").addMigrations(*TrackerDatabase.MIGRATIONS).allowMainThreadQueries().build()
             runBlocking {
+                db.openHelper.writableDatabase.execSQL("DELETE FROM nafl_log")
                 val today = LocalDate.now()
                 for (i in 1..420) {
                     val day = today.minusDays(i.toLong())
@@ -71,6 +72,24 @@ abstract class StreaksScreensSmoke {
         compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(text, substring = true)); settle()
     }
     private fun noError(where: String) = assertNull("error on $where: ${AppErrors.latest.value}", AppErrors.latest.value)
+
+    @Test fun naflTabLoadsAndPersistsACheckmark() {
+        AppErrors.latest.value = null
+        settle(); click("Streaks"); click("Nafl")
+        awaitText("Daily Sunnah")
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val db = Room.databaseBuilder(ctx, TrackerDatabase::class.java, "tracker.db").addMigrations(*TrackerDatabase.MIGRATIONS).allowMainThreadQueries().build()
+        try {
+            val mark = compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Mark Before Fajr")).onFirst()
+            mark.performScrollTo().performClick(); settle()
+            compose.waitUntil(10_000) {
+                // Fetching semantics drains the UI looper so Room's suspended write can resume on Main.
+                compose.onAllNodes(androidx.compose.ui.test.hasContentDescription("Mark Before Fajr")).fetchSemanticsNodes()
+                runBlocking { db.nafl().logs().any { it.itemId == "fajr_before" && it.date == LocalDate.now().toString() && it.count == 1 } }
+            }
+        } finally { db.close() }
+        noError("Nafl")
+    }
 
     @Test fun statsPeriodsAndQadaRender() {
         AppErrors.latest.value = null

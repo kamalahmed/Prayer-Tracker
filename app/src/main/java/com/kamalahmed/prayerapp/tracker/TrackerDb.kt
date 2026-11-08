@@ -52,12 +52,14 @@ interface PrayerLogDao {
 }
 
 @Database(
-    entities = [PrayerLog::class, com.kamalahmed.prayerapp.qada.QadaDebt::class, com.kamalahmed.prayerapp.qada.QadaEntry::class, com.kamalahmed.prayerapp.qada.QadaConfig::class],
-    version = 2, exportSchema = true,
+    entities = [PrayerLog::class, com.kamalahmed.prayerapp.qada.QadaDebt::class, com.kamalahmed.prayerapp.qada.QadaEntry::class, com.kamalahmed.prayerapp.qada.QadaConfig::class, com.kamalahmed.prayerapp.nafl.NaflItem::class, com.kamalahmed.prayerapp.nafl.NaflLog::class, com.kamalahmed.prayerapp.nafl.QuranReminder::class],
+    version = 3, exportSchema = true,
 )
 abstract class TrackerDatabase : RoomDatabase() {
     abstract fun dao(): PrayerLogDao
     abstract fun qada(): com.kamalahmed.prayerapp.qada.QadaDao
+
+    abstract fun nafl(): com.kamalahmed.prayerapp.nafl.NaflDao
 
     companion object {
         /** v1 -> v2 (beta.6): adds the Qada (make-up prayer) tables. prayer_log is untouched. */
@@ -69,7 +71,14 @@ abstract class TrackerDatabase : RoomDatabase() {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `qada_config` (`id` INTEGER NOT NULL, `witr` INTEGER NOT NULL, `dailyGoal` INTEGER NOT NULL, `reminder` INTEGER NOT NULL, `reminderMinute` INTEGER NOT NULL, `setupDone` INTEGER NOT NULL, PRIMARY KEY(`id`))")
             }
         }
-        val MIGRATIONS = arrayOf(MIGRATION_1_2)
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `nafl_item` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `group` TEXT NOT NULL, `rakaat` INTEGER NOT NULL, `baseline` INTEGER NOT NULL, `enabled` INTEGER NOT NULL, `position` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `nafl_log` (`date` TEXT NOT NULL, `itemId` TEXT NOT NULL, `count` INTEGER NOT NULL, `pages` INTEGER NOT NULL, `minutes` INTEGER NOT NULL, PRIMARY KEY(`date`, `itemId`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `quran_reminder` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `minute` INTEGER NOT NULL, `enabled` INTEGER NOT NULL, `alarmSound` INTEGER NOT NULL)")
+            }
+        }
+        val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
     }
 }
 
@@ -81,5 +90,6 @@ object TrackerModule {
         Room.databaseBuilder(ctx, TrackerDatabase::class.java, "tracker.db").addMigrations(*TrackerDatabase.MIGRATIONS).build()
 
     @Provides fun dao(db: TrackerDatabase): PrayerLogDao = db.dao()
+    @Provides fun naflDao(db: TrackerDatabase): com.kamalahmed.prayerapp.nafl.NaflDao = db.nafl()
     @Provides fun qadaDao(db: TrackerDatabase): com.kamalahmed.prayerapp.qada.QadaDao = db.qada()
 }

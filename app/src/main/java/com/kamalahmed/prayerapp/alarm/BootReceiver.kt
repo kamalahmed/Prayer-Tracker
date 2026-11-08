@@ -17,11 +17,14 @@ class BootReceiver : BroadcastReceiver() {
     @Inject lateinit var scheduler: AlarmScheduler
     @Inject lateinit var hooks: AlarmHooks
 
+    @Inject lateinit var quranReminders: com.kamalahmed.prayerapp.nafl.QuranReminders
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action !in ACTIONS) return
         launchAsync("BootReceiver") {
             guard("BootReceiver", "channels") { Channels.create(context) }
             guard("BootReceiver", "rescheduleAll") { scheduler.rescheduleAll() }
+            guard("BootReceiver", "Quran reminders") { quranReminders.reschedule() }
             guard("BootReceiver", "onSystemChange") { hooks.onSystemChange() }
         }
     }

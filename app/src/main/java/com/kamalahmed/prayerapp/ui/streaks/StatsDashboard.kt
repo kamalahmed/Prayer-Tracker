@@ -75,18 +75,22 @@ import java.util.Locale
 fun StreaksScreen(vm: StreaksViewModel = hiltViewModel()) {
     var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (tab == 0) "Streaks" else "Qada", fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            androidx.compose.material3.SingleChoiceSegmentedButtonRow {
-                listOf("Stats", "Qada").forEachIndexed { i, l ->
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
+            Text(when (tab) { 0 -> "Streaks"; 1 -> "Qada"; else -> "Nafl" }, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                listOf("Stats", "Qada", "Nafl").forEachIndexed { i, l ->
                     SegmentedButton(
                         selected = tab == i, onClick = { tab = i },
-                        shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(i, 2),
+                        shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(i, 3),
                     ) { Text(l) }
                 }
             }
         }
-        if (tab == 0) StatsContent(vm) else com.kamalahmed.prayerapp.ui.qada.QadaScreen()
+        when (tab) {
+            0 -> StatsContent(vm)
+            1 -> com.kamalahmed.prayerapp.ui.qada.QadaScreen()
+            else -> com.kamalahmed.prayerapp.ui.nafl.NaflScreen()
+        }
     }
 }
 

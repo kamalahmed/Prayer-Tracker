@@ -61,6 +61,7 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <receiver android:name=".nafl.QuranReminderReceiver" android:exported="false" />
         <receiver android:name=".alarm.AlarmReceiver" android:exported="false" />
         <receiver android:name=".update.InstallReceiver" android:exported="false" />
         <receiver android:name=".tracker.MarkPrayedReceiver" android:exported="false" />
