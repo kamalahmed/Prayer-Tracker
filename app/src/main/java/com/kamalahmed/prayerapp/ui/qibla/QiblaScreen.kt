@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -76,47 +77,17 @@ class QiblaViewModel @Inject constructor(repo: SettingsRepository) : ViewModel()
 fun angleDiff(a: Float, b: Float): Float { var d = (a - b) % 360f; if (d > 180) d -= 360; if (d <= -180) d += 360; return d }
 
 @Composable
-fun QiblaScreen(vm: QiblaViewModel = hiltViewModel()) {
+fun QiblaScreen(vm: QiblaViewModel = hiltViewModel(), onOpenLocation: () -> Unit = {}) {
     val settings by vm.settings.collectAsStateWithLifecycle(initialValue = null)
     val s = settings ?: return
     val ctx = LocalContext.current
-    var heading by remember { mutableFloatStateOf(0f) }
-    var accuracy by remember { mutableIntStateOf(SensorManager.SENSOR_STATUS_UNRELIABLE) }
-    var hasSensor by remember { mutableIntStateOf(1) }
-
     val declination = remember(s.latitude, s.longitude) {
-        GeomagneticField(s.latitude.toFloat(), s.longitude.toFloat(), 0f, System.currentTimeMillis()).declination
+        runCatching { GeomagneticField(s.latitude.toFloat(), s.longitude.toFloat(), 0f, System.currentTimeMillis()).declination }.getOrDefault(0f)
     }
-
-    DisposableEffect(Unit) {
-        val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        val sensor = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
-        val rot = FloatArray(9); val remapped = FloatArray(9); val orient = FloatArray(3)
-        @Suppress("DEPRECATION")
-        val display = (ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
-        val listener = object : SensorEventListener {
-            override fun onSensorChanged(e: SensorEvent) {
-                SensorManager.getRotationMatrixFromVector(rot, e.values)
-                val (x, y) = when (display.rotation) {
-                    Surface.ROTATION_90 -> SensorManager.AXIS_Y to SensorManager.AXIS_MINUS_X
-                    Surface.ROTATION_180 -> SensorManager.AXIS_MINUS_X to SensorManager.AXIS_MINUS_Y
-                    Surface.ROTATION_270 -> SensorManager.AXIS_MINUS_Y to SensorManager.AXIS_X
-                    else -> SensorManager.AXIS_X to SensorManager.AXIS_Y
-                }
-                SensorManager.remapCoordinateSystem(rot, x, y, remapped)
-                SensorManager.getOrientation(remapped, orient)
-                val magnetic = Math.toDegrees(orient[0].toDouble()).toFloat()
-                val trueHeading = (magnetic + declination + 360f) % 360f
-                // low-pass filter on the circle
-                heading = (heading + angleDiff(trueHeading, heading) * 0.15f + 360f) % 360f
-                if (e.accuracy != accuracy) accuracy = e.accuracy
-            }
-            override fun onAccuracyChanged(sensor: Sensor, acc: Int) { accuracy = acc }
-        }
-        if (sensor == null) hasSensor = 0 else sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
-        onDispose { sm.unregisterListener(listener) }
-    }
-
+    val reading = rememberCompassReading(ctx, declination)
+    val heading = reading.heading
+    val status = reading.status
+    val live = status == CompassStatus.OK || status == CompassStatus.CALIBRATE
     val qibla = Qibla.bearing(s.latitude, s.longitude).toFloat()
     val distance = Qibla.distanceKm(s.latitude, s.longitude)
     val compassRot by animateFloatAsState(-heading, tween(120), label = "compass")
@@ -172,11 +143,20 @@ fun QiblaScreen(vm: QiblaViewModel = hiltViewModel()) {
         Text("Qibla", fontSize = 26.sp, color = Gold)
         Text("${qibla.roundToInt()}° from true north · ${distance.roundToInt()} km to Makkah", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
-        AccuracyIndicator(if (hasSensor == 0) -1 else accuracy)
+        CompassStatusBanner(status, reading.source)
+        LocationNote(s, onOpenLocation)
     }
     val footer: @Composable () -> Unit = {
-        Text(turnText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = if (aligned) AccentGreen else Color.White)
-        Text("Heading ${heading.roundToInt()}°", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (live) {
+            Text(turnText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = if (aligned) AccentGreen else Color.White)
+            Text("Heading ${heading.roundToInt()}°", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Text("Qibla bearing ${qibla.roundToInt()}° (clockwise from true north)", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Gold)
+            Text(
+                "Use this bearing with any compass. The dial below is drawn with north at the top.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             "Hold the phone flat, away from metal and magnets.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -210,17 +190,48 @@ fun QiblaScreen(vm: QiblaViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun AccuracyIndicator(acc: Int) {
-    val (label, color) = when (acc) {
-        -1 -> "No compass sensor on this device" to Danger
-        SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> "Compass accuracy: high" to AccentGreen
-        SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> "Compass accuracy: medium" to Gold
-        SensorManager.SENSOR_STATUS_ACCURACY_LOW -> "Accuracy low – move phone in a figure-8" to Danger
-        else -> "Calibrate: move phone in a figure-8" to Danger
+private fun CompassStatusBanner(status: CompassStatus, source: CompassSource?) {
+    val (label, color) = when (status) {
+        CompassStatus.OK -> "Compass ready" to AccentGreen
+        CompassStatus.WAITING -> "Starting compass…" to Gold
+        CompassStatus.CALIBRATE -> "Calibration needed: move the phone in a figure-8 a few times" to Gold
+        CompassStatus.NO_DATA -> "The compass sensor is not sending data. Close other compass apps, then reopen this tab, or restart the phone." to Danger
+        CompassStatus.NO_MAGNETOMETER -> "This phone has no magnetic sensor, so the direction can't be shown live." to Danger
     }
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
         Box(Modifier.size(10.dp).background(color, CircleShape))
         Spacer(Modifier.width(8.dp))
         Text(label, color = color, style = MaterialTheme.typography.labelLarge)
     }
+    if (source != null && source != CompassSource.ROTATION_VECTOR && status != CompassStatus.NO_MAGNETOMETER) {
+        Text("Sensor: ${source.label}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
+
+@Composable
+private fun LocationNote(s: AppSettings, onOpenLocation: () -> Unit) {
+    val ctx = LocalContext.current
+    var granted by remember { mutableStateOf(hasLocationPermission(ctx)) }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+    ) { granted = hasLocationPermission(ctx) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Location: ${s.cityName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.material3.TextButton(onClick = onOpenLocation) { Text("Change") }
+    }
+    if (s.autoLocation && !granted) {
+        Text(
+            "Automatic location is on but location permission is off, so the Qibla uses your last saved place.",
+            style = MaterialTheme.typography.bodySmall, color = Gold,
+        )
+        androidx.compose.material3.TextButton(onClick = {
+            runCatching {
+                launcher.launch(arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION))
+            }
+        }) { Text("Allow location") }
+    }
+}
+
+private fun hasLocationPermission(ctx: Context) =
+    androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) ==
+        android.content.pm.PackageManager.PERMISSION_GRANTED

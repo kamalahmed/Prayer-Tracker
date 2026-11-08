@@ -160,7 +160,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, back: () -> U
         composable(TopDest.TIMES.route) {
             TimesScreen(onCalendar = { nav.navigate(Routes.CALENDAR) }, onHolidays = { nav.navigate(Routes.HOLIDAYS) })
         }
-        composable(TopDest.QIBLA.route) { QiblaScreen() }
+        composable(TopDest.QIBLA.route) { QiblaScreen(onOpenLocation = { nav.navigate(SettingsDest.LOCATION.route) }) }
         composable(TopDest.SETTINGS.route) {
             if (spec.listDetail) SettingsListDetail()
             else MaxWidth { SettingsList(open = { nav.navigate(it.route) }, openApp = { nav.navigate(SettingsDest.APP.route) }) }
