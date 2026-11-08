@@ -17,7 +17,10 @@ data class Counts(val onTime: Int = 0, val late: Int = 0, val missed: Int = 0, v
     operator fun plus(o: Counts) = Counts(onTime + o.onTime, late + o.late, missed + o.missed, due + o.due)
 }
 
-data class Bucket(val label: String, val start: LocalDate, val end: LocalDate, val counts: Counts)
+data class Bucket(val label: String, val start: LocalDate, val end: LocalDate, val counts: Counts, val tracked: Boolean = counts.due > 0) {
+    /** Share of tracked prayers prayed on time (0..100), null when nothing was due. */
+    val onTimeRate: Int? get() = if (counts.due == 0) null else Math.round(counts.onTime * 100f / counts.due)
+}
 data class PrayerRank(val prayer: Prayer, val counts: Counts) {
     val missedPct: Int get() = if (counts.due == 0) 0 else Math.round(counts.missed * 100f / counts.due)
 }
@@ -37,6 +40,8 @@ data class PeriodReport(
     val heatmap: List<Pair<LocalDate, Int?>>,
     val insights: List<String>,
     val isEmpty: Boolean,
+    /** First tracked day (days before it are shown as "no data", not as missed). */
+    val firstDay: LocalDate = start,
 ) {
     /** Completion % change vs the previous period (percentage points). */
     val trend: Int get() = totals.completionPct - previous.completionPct
@@ -115,11 +120,12 @@ object Stats {
         val buckets = when (period) {
             StatsPeriod.WEEK, StatsPeriod.MONTH -> generateSequence(start) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }.map { d ->
                 val label = if (period == StatsPeriod.WEEK) d.dayOfWeek.getDisplayName(TextStyle.SHORT, locale) else "${d.dayOfMonth}"
-                Bucket(label, d, d, dayCounts(data, d, today, passedToday, first))
+                Bucket(label, d, d, dayCounts(data, d, today, passedToday, first), tracked = !d.isBefore(first) && !d.isAfter(today))
             }.toList()
             StatsPeriod.YEAR -> (0 until 12).map { i ->
                 val ms = start.plusMonths(i.toLong()); val me = ms.plusMonths(1).minusDays(1)
-                Bucket(ms.month.getDisplayName(TextStyle.SHORT, locale), ms, me, counts(data, ms, me, today, passedToday, first))
+                Bucket(ms.month.getDisplayName(TextStyle.SHORT, locale), ms, me, counts(data, ms, me, today, passedToday, first),
+                    tracked = !me.isBefore(first) && !ms.isAfter(today))
             }
         }
         val perPrayer = Prayer.obligatory.map { p -> PrayerRank(p, counts(data, start, end, today, passedToday, first, p)) }
@@ -129,7 +135,7 @@ object Stats {
         }.toList()
         val isEmpty = data.isEmpty() || totals.due == 0
         return PeriodReport(period, start, end, title(period, start, end, locale), totals, previous, buckets, perPrayer, heat,
-            insights(period, totals, previous, perPrayer), isEmpty)
+            insights(period, totals, previous, perPrayer), isEmpty, first)
     }
 
     fun title(period: StatsPeriod, start: LocalDate, end: LocalDate, locale: Locale): String = when (period) {
