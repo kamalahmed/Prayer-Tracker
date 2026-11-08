@@ -51,9 +51,26 @@ interface PrayerLogDao {
     suspend fun clear()
 }
 
-@Database(entities = [PrayerLog::class], version = 1, exportSchema = true)
+@Database(
+    entities = [PrayerLog::class, com.kamalahmed.prayerapp.qada.QadaDebt::class, com.kamalahmed.prayerapp.qada.QadaEntry::class, com.kamalahmed.prayerapp.qada.QadaConfig::class],
+    version = 2, exportSchema = true,
+)
 abstract class TrackerDatabase : RoomDatabase() {
     abstract fun dao(): PrayerLogDao
+    abstract fun qada(): com.kamalahmed.prayerapp.qada.QadaDao
+
+    companion object {
+        /** v1 -> v2 (beta.6): adds the Qada (make-up prayer) tables. prayer_log is untouched. */
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `qada_debt` (`prayer` TEXT NOT NULL, `owed` INTEGER NOT NULL, PRIMARY KEY(`prayer`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `qada_entry` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `prayer` TEXT NOT NULL, `count` INTEGER NOT NULL, `date` TEXT NOT NULL, `at` INTEGER NOT NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_qada_entry_date` ON `qada_entry` (`date`)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `qada_config` (`id` INTEGER NOT NULL, `witr` INTEGER NOT NULL, `dailyGoal` INTEGER NOT NULL, `reminder` INTEGER NOT NULL, `reminderMinute` INTEGER NOT NULL, `setupDone` INTEGER NOT NULL, PRIMARY KEY(`id`))")
+            }
+        }
+        val MIGRATIONS = arrayOf(MIGRATION_1_2)
+    }
 }
 
 @Module
@@ -61,7 +78,8 @@ abstract class TrackerDatabase : RoomDatabase() {
 object TrackerModule {
     @Provides @Singleton
     fun db(@ApplicationContext ctx: Context): TrackerDatabase =
-        Room.databaseBuilder(ctx, TrackerDatabase::class.java, "tracker.db").build()
+        Room.databaseBuilder(ctx, TrackerDatabase::class.java, "tracker.db").addMigrations(*TrackerDatabase.MIGRATIONS).build()
 
     @Provides fun dao(db: TrackerDatabase): PrayerLogDao = db.dao()
+    @Provides fun qadaDao(db: TrackerDatabase): com.kamalahmed.prayerapp.qada.QadaDao = db.qada()
 }
