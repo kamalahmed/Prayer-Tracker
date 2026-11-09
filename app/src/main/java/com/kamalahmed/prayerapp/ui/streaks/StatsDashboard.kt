@@ -70,32 +70,44 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Streaks tab: "Stats" (tracker dashboard) and "Qada" (make-up prayers) sub-tabs, keeping 5 nav destinations. */
+/** Streaks tab: "Stats", "Insights", "Qada" and "Nafl" sub-tabs, keeping 5 nav destinations. Coach buttons deep-link via [onOpenSettings]. */
 @Composable
-fun StreaksScreen(vm: StreaksViewModel = hiltViewModel(), onSummaries: ()->Unit={}) {
-    var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
+fun StreaksScreen(vm: StreaksViewModel = hiltViewModel(), onSummaries: ()->Unit={}, onOpenSettings: (com.kamalahmed.prayerapp.ui.settings.SettingsDest)->Unit={}) {
+    var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(StreaksTab.STATS) }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Text(when (tab) { 0 -> "Streaks"; 1 -> "Qada"; else -> "Nafl" },Modifier.weight(1f),fontSize=30.sp,fontWeight=FontWeight.Bold)
+                Text(if (tab == StreaksTab.STATS) "Streaks" else tab.label,Modifier.weight(1f),fontSize=30.sp,fontWeight=FontWeight.Bold)
                 TextButton(onClick=onSummaries) { Text("Your summaries") }
             }
             androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                listOf("Stats", "Qada", "Nafl").forEachIndexed { i, l ->
+                StreaksTab.entries.forEachIndexed { i, t ->
                     SegmentedButton(
-                        selected = tab == i, onClick = { tab = i },
-                        shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(i, 3),
-                    ) { Text(l) }
+                        selected = tab == t, onClick = { tab = t },
+                        shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(i, StreaksTab.entries.size),
+                        icon = {},
+                    ) { Text(t.label, maxLines = 1, softWrap = false) }
                 }
             }
         }
         when (tab) {
-            0 -> StatsContent(vm)
-            1 -> com.kamalahmed.prayerapp.ui.qada.QadaScreen()
-            else -> com.kamalahmed.prayerapp.ui.nafl.NaflScreen(onSummaries=onSummaries)
+            StreaksTab.STATS -> StatsContent(vm)
+            StreaksTab.INSIGHTS -> com.kamalahmed.prayerapp.ui.insights.InsightsScreen(onAction = { action, _ ->
+                when (action) {
+                    com.kamalahmed.prayerapp.insights.CoachAction.IQAMAH_ALARM -> onOpenSettings(com.kamalahmed.prayerapp.ui.settings.SettingsDest.IQAMA)
+                    com.kamalahmed.prayerapp.insights.CoachAction.PRAYER_ALERTS -> onOpenSettings(com.kamalahmed.prayerapp.ui.settings.SettingsDest.NOTIFICATIONS)
+                    com.kamalahmed.prayerapp.insights.CoachAction.NAFL -> tab = StreaksTab.NAFL
+                    com.kamalahmed.prayerapp.insights.CoachAction.QADA -> tab = StreaksTab.QADA
+                    com.kamalahmed.prayerapp.insights.CoachAction.STATS -> tab = StreaksTab.STATS
+                }
+            })
+            StreaksTab.QADA -> com.kamalahmed.prayerapp.ui.qada.QadaScreen()
+            StreaksTab.NAFL -> com.kamalahmed.prayerapp.ui.nafl.NaflScreen(onSummaries=onSummaries)
         }
     }
 }
+
+enum class StreaksTab(val label: String) { STATS("Stats"), INSIGHTS("Insights"), QADA("Qada"), NAFL("Nafl") }
 
 @Composable
 fun StatsContent(vm: StreaksViewModel) {

@@ -45,6 +45,11 @@ data class QadaConfig(
     val setupDone: Boolean = false,
 )
 
+/** Aggregate rows: the Qada screen never loads every entry (18,000+ prayers stay cheap). */
+data class QadaPrayerTotal(val prayer: String, val total: Long)
+data class QadaDayTotal(val date: String, val total: Long)
+data class QadaDayPrayerTotal(val date: String, val prayer: String, val total: Long)
+
 @Dao
 interface QadaDao {
     @Query("SELECT * FROM qada_debt") fun observeDebt(): Flow<List<QadaDebt>>
@@ -53,6 +58,18 @@ interface QadaDao {
     @Query("SELECT * FROM qada_config WHERE id = 0") fun observeConfig(): Flow<QadaConfig?>
     @Query("SELECT * FROM qada_config WHERE id = 0") suspend fun config(): QadaConfig?
     @Query("SELECT COALESCE(SUM(count), 0) FROM qada_entry WHERE date = :date") suspend fun countOn(date: String): Int
+
+    @Query("SELECT prayer, COALESCE(SUM(count), 0) AS total FROM qada_entry GROUP BY prayer") fun observeTotals(): Flow<List<QadaPrayerTotal>>
+    @Query("SELECT date, COALESCE(SUM(count), 0) AS total FROM qada_entry GROUP BY date") fun observeDayTotals(): Flow<List<QadaDayTotal>>
+    @Query("SELECT date, COALESCE(SUM(count), 0) AS total FROM qada_entry GROUP BY date") suspend fun dayTotals(): List<QadaDayTotal>
+    @Query("SELECT date, prayer, COALESCE(SUM(count), 0) AS total FROM qada_entry WHERE date >= :from GROUP BY date, prayer") fun observeBreakdown(from: String): Flow<List<QadaDayPrayerTotal>>
+    @Query("SELECT date, prayer, COALESCE(SUM(count), 0) AS total FROM qada_entry WHERE date = :date GROUP BY prayer") suspend fun breakdownOn(date: String): List<QadaDayPrayerTotal>
+    /** Today's made-up prayers logged up to [until] (epoch ms): lets Insights compare with yesterday at the same time. */
+    @Query("SELECT COALESCE(SUM(count), 0) FROM qada_entry WHERE date = :date AND at <= :until") suspend fun countOnUntil(date: String, until: Long): Int
+    @Query("SELECT * FROM qada_entry WHERE date = :date AND prayer = :prayer ORDER BY at DESC, id DESC") suspend fun entriesOn(date: String, prayer: String): List<QadaEntry>
+    @Query("SELECT COUNT(*) FROM qada_entry") suspend fun entryCount(): Int
+    @Query("UPDATE qada_entry SET count = :count WHERE id = :id") suspend fun updateCount(id: Long, count: Int)
+    @Query("DELETE FROM qada_entry WHERE id IN (:ids)") suspend fun deleteIds(ids: List<Long>): Int
 
     @Upsert suspend fun upsertDebt(d: List<QadaDebt>)
     @Upsert suspend fun upsertConfig(c: QadaConfig)
@@ -63,5 +80,22 @@ interface QadaDao {
     @Query("DELETE FROM qada_debt") suspend fun clearDebt()
 
     @Transaction suspend fun replaceDebt(d: List<QadaDebt>) { clearDebt(); upsertDebt(d) }
+    /**
+     * Sets how many [prayer] were made up on [date]. Increases insert one entry for the difference; decreases trim the
+     * newest entries of that day first. Other days and prayers are never touched. Returns the inserted id (or null).
+     */
+    @Transaction suspend fun setDayCount(date: String, prayer: String, target: Int, now: Long): Long? {
+        val rows = entriesOn(date, prayer)
+        val current = rows.sumOf { it.count.coerceAtLeast(0) }
+        if (target > current) return insert(QadaEntry(prayer = prayer, count = target - current, date = date, at = now))
+        var excess = current - target
+        for (row in rows) {
+            if (excess <= 0) break
+            val c = row.count.coerceAtLeast(0)
+            if (c <= excess) { delete(row.id); excess -= c } else { updateCount(row.id, c - excess); excess = 0 }
+        }
+        return null
+    }
+
     @Transaction suspend fun resetAll() { clearEntries(); clearDebt(); upsertConfig(QadaConfig()) }
 }

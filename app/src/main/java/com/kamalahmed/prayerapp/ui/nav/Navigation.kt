@@ -172,7 +172,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, back: () -> U
                 }) }
             }
         }
-        composable(TopDest.STREAKS.route) { StreaksScreen(onSummaries={nav.navigate(Routes.SUMMARIES)}) }
+        composable(TopDest.STREAKS.route) { StreaksScreen(onSummaries={nav.navigate(Routes.SUMMARIES)}, onOpenSettings={ nav.navigate(it.route) }) }
         composable(Routes.SUMMARIES+"?kind={kind}&date={date}",arguments=listOf(
             androidx.navigation.navArgument("kind") { type=androidx.navigation.NavType.StringType;defaultValue="DAY" },
             androidx.navigation.navArgument("date") { type=androidx.navigation.NavType.StringType;defaultValue="" },

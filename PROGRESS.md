@@ -33,7 +33,7 @@ To resume: `git tag -l 'phase-*'`, check out the latest, and continue with the n
 - Not yet verified on a device: the end-to-end update install. It needs a second, higher release published on GitHub.
 
 ## What's next
-Current next step: install the signed beta.12 over beta.11 and check, on a real phone, a large Dhuhr start adjustment (e.g. +114 min or fixed 1:30 PM) and a before-iqamah alarm (volume, Stop, full-screen) alongside the adhan alarm. Phase 20 is committed/tagged locally only; do not push or publish without a separate request.
+Current next step: install the signed beta.13 over beta.12 and check, on a real phone, Qada tap feedback (haptics, snackbar Undo, +N sheet, Edit day) and the new Insights tab (coach deep link to Settings › Iqamah, Hide coach / Not helpful). Phase 21 is committed/tagged locally only; do not push or publish without a separate request.
 
 ## Phase 10 — Feedback (v0.1.0-beta.2, versionCode 3) — tag `phase-10-feedback`
 - Masjid finder rebuilt on OSM Overpass: 2 endpoints, timeouts, User-Agent, 24h cache per ~1km cell, offline and error states, list sorted by distance, geo: intent.
@@ -148,3 +148,15 @@ Current next step: install the signed beta.12 over beta.11 and check, on a real 
 - **Quiet iqamah root cause:** the before-iqamah notice was a plain notification on the shared beep channel (default notification tone, `USAGE_NOTIFICATION_EVENT` → notification stream, once, 1–2 s, muted by silent/DND) scheduled without `setAlarmClock`; the adhan alone used the app's ALARM-stream player.
 - **Before-iqamah alarm:** separate from the start alarm, per prayer toggle + minutes before (chips/custom) + full alarm (default) or quiet notification; Jumu'ah too. Full alarm uses `setAlarmClock` and `AdhanService` on `USAGE_ALARM` with its own sound (system alarm / bundled / ringtone), volume, repeat, stop-after and optional full-screen; refused service start falls back to a new alarm-stream channel. Adhan is never cut off by an iqamah alarm (notice instead). Existing iqamah enable/lead/times migrate unchanged and now default to the full alarm. Rescheduled on settings change, boot, update, time/zone change, restore.
 - **Results:** 287 tests (268 + 19 new), 0 failures; lint 0 errors; debug/instrumentation/signed release build. Review `docs/REVIEW_beta12.md`. No Room change. No push/publication; hardware loudness/OEM/full-screen not tested on a device.
+## Phase 21: Qada logging feedback + Insights (v0.1.0-beta.13, versionCode 14), tag `phase-21-qada-insights`
+- **Qada logging:** numbered sections. Every tap gives feedback: press animation, row flash, floating +N, ×N pop, haptics that follow the shared Tasbih "haptics" preference, and a snackbar with exact-action UNDO. Rows done today are highlighted (✓ ×N). A +N bottom sheet (2–100) and "+1 full day" (one Undo removes all 5). With a daily goal, a gold "Goal reached" state.
+- **History:** day rows for 14 days, then month rows (weeks inside) for 12 months, then year rows. Edit day uses steppers and Undo last. This replaces the per-entry list.
+- **Insights:** new Streaks sub-tab (Stats / Insights / Qada / Nafl). It is on-device and rule-based:
+  - At a glance (Good / Needs attention / Not tracked yet);
+  - coach with praise and at most 3 suggestions. Buttons deep-link to Settings › Iqamah, Qada or Nafl. Not helpful mutes for 28 days and Hide coach is backed up; both persist;
+  - fard combined / per prayer;
+  - vs yesterday at the same time and vs last week;
+  - Week/Month trends and scorecards;
+  - empty and new-user states.
+- **Performance/data:** all Qada, Insights and Summary reads are SQL aggregates, tested with 18,250 entries. No Room change: v4, and a v4 open test keeps every row. Backup gains `insights.coach_hidden`.
+- **Results:** 305 tests (287 + 18 new), 0 failures. Review in `docs/REVIEW_beta13.md`. No push or publication.

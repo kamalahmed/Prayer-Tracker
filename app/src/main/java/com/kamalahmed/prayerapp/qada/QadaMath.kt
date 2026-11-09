@@ -86,13 +86,18 @@ object QadaStats {
     }
 
     fun report(debt: List<QadaDebt>, entries: List<QadaEntry>, config: QadaConfig, today: LocalDate): QadaReport {
-        val owed = debt.mapNotNull { d -> QadaPrayer.of(d.prayer)?.let { it to max(0, d.owed) } }.toMap()
         val parsed = entries.mapNotNull { e ->
             val p = QadaPrayer.of(e.prayer) ?: return@mapNotNull null
             val d = runCatching { LocalDate.parse(e.date) }.getOrNull() ?: return@mapNotNull null
             Triple(p, d, max(0, e.count))
         }
-        val done = parsed.groupBy { it.first }.mapValues { (_, l) -> l.sumOf { it.third } }
+        return report(debt, parsed.groupBy { it.first }.mapValues { (_, l) -> l.sumOf { it.third } },
+            parsed.groupBy { it.second }.mapValues { (_, l) -> l.sumOf { it.third } }, config, today)
+    }
+
+    /** Same report from aggregate rows (per-prayer totals + per-day totals): what the app uses, O(days) not O(entries). */
+    fun report(debt: List<QadaDebt>, done: Map<QadaPrayer, Int>, perDay: Map<LocalDate, Int>, config: QadaConfig, today: LocalDate): QadaReport {
+        val owed = debt.mapNotNull { d -> QadaPrayer.of(d.prayer)?.let { it to max(0, d.owed) } }.toMap()
         val shown = QadaPrayer.entries.filter { it != QadaPrayer.WITR || config.witr || (owed[it] ?: 0) > 0 || (done[it] ?: 0) > 0 }
         val lines = shown.map { QadaLine(it, owed[it] ?: 0, done[it] ?: 0) }
         val fard = lines.filter { it.prayer in QadaPrayer.fard }
@@ -103,7 +108,6 @@ object QadaStats {
         val daysCovered = if (fard.size < 5) 0 else fard.minOf { if (it.owed > 0) minOf(it.done, it.owed) else it.done }
         val daysRemaining = if (fard.isEmpty()) 0 else fard.maxOf { it.remaining }
 
-        val perDay = parsed.groupBy { it.second }.mapValues { (_, l) -> l.sumOf { it.third } }
         fun sumSince(from: LocalDate) = perDay.filterKeys { !it.isBefore(from) && !it.isAfter(today) }.values.sum()
         val last7 = sumSince(today.minusDays(6)); val last30 = sumSince(today.minusDays(29))
         val first = perDay.keys.minOrNull()
@@ -133,5 +137,53 @@ object QadaStats {
             lines, totalOwed, totalDone, daysCovered, fardDone / 5.0, daysRemaining,
             perDay[today] ?: 0, last7, last30, pace, finish, streak, best, weekly, monthly, config.dailyGoal,
         )
+    }
+}
+
+/** One collapsible history row: a day (with per-prayer counts), a month (weeks inside) or a year (months inside). */
+data class QadaHistoryRow(
+    val key: String,
+    val kind: Kind,
+    val start: LocalDate,
+    val end: LocalDate,
+    val total: Int,
+    val activeDays: Int,
+    val perPrayer: Map<QadaPrayer, Int> = emptyMap(),
+    val children: List<QadaHistoryRow> = emptyList(),
+) { enum class Kind { DAY, WEEK, MONTH, YEAR } }
+
+/**
+ * Compact history: one row per day for the recent [DAY_WINDOW] days, then one row per month (weeks inside) for the
+ * last 12 months, then one row per year (months inside). Row count stays tiny however many entries exist.
+ */
+object QadaHistory {
+    const val DAY_WINDOW = 14L
+
+    fun dayWindowStart(today: LocalDate): LocalDate = today.minusDays(DAY_WINDOW - 1)
+
+    fun build(perDay: Map<LocalDate, Int>, breakdown: Map<LocalDate, Map<QadaPrayer, Int>>, today: LocalDate): List<QadaHistoryRow> {
+        val windowStart = dayWindowStart(today)
+        val active = perDay.filter { it.value > 0 && !it.key.isAfter(today) }
+        val days = active.filterKeys { !it.isBefore(windowStart) }.toSortedMap(reverseOrder()).map { (d, n) ->
+            QadaHistoryRow("d:$d", QadaHistoryRow.Kind.DAY, d, d, n, 1, breakdown[d].orEmpty().filterValues { it > 0 })
+        }
+        val older = active.filterKeys { it.isBefore(windowStart) }
+        val monthCut = today.withDayOfMonth(1).minusMonths(11)
+        val months = older.filterKeys { !it.isBefore(monthCut) }.entries.groupBy { it.key.withDayOfMonth(1) }.toSortedMap(reverseOrder()).map { (ms, list) ->
+            val me = ms.plusMonths(1).minusDays(1)
+            val weeks = list.groupBy { it.key.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }.toSortedMap(reverseOrder()).map { (ws, wl) ->
+                val s = maxOf(ws, ms); val e = minOf(ws.plusDays(6), me)
+                QadaHistoryRow("w:$s", QadaHistoryRow.Kind.WEEK, s, e, wl.sumOf { it.value }, wl.size)
+            }
+            QadaHistoryRow("m:$ms", QadaHistoryRow.Kind.MONTH, ms, me, list.sumOf { it.value }, list.size, children = weeks)
+        }
+        val years = older.filterKeys { it.isBefore(monthCut) }.entries.groupBy { it.key.year }.toSortedMap(reverseOrder()).map { (y, list) ->
+            val inner = list.groupBy { it.key.withDayOfMonth(1) }.toSortedMap(reverseOrder()).map { (ms, ml) ->
+                QadaHistoryRow("ym:$ms", QadaHistoryRow.Kind.MONTH, ms, ms.plusMonths(1).minusDays(1), ml.sumOf { it.value }, ml.size)
+            }
+            val s = list.minOf { it.key }; val e = list.maxOf { it.key }
+            QadaHistoryRow("y:$y", QadaHistoryRow.Kind.YEAR, s, e, list.sumOf { it.value }, list.size, children = inner)
+        }
+        return days + months + years
     }
 }

@@ -45,6 +45,7 @@ object BackupUserPrefs {
         }
         return JSONObject().put("sounds",sounds).put("settings",settingJson).put("widgets",WidgetStyleStore(ctx).backupExport())
             .put("tasbih",JSONObject().put("volume",tasbih.getBoolean("volume",false)).put("haptics",tasbih.getBoolean("haptics",true)))
+            .put("insights",JSONObject().put("coach_hidden",ctx.getSharedPreferences("insights",Context.MODE_PRIVATE).getBoolean("coach_hidden",false)))
             .put("updates",JSONObject().put("auto",updates.autoCheck.value).put("wifi",updates.wifiOnly.value).put("beta",updates.includeBeta.value))
     }
 }
@@ -103,7 +104,7 @@ class BackupRepository @Inject constructor(
         return BackupCodec.summary(root)
     }
     private fun validatePreferences(p: JSONObject) {
-        require(p.keys().asSequence().all { it in setOf("settings","widgets","tasbih","updates","sounds") && p.get(it) is JSONObject })
+        require(p.keys().asSequence().all { it in setOf("settings","widgets","tasbih","updates","sounds","insights") && p.get(it) is JSONObject })
         p.optJSONObject("sounds")?.let { sounds ->
             require(sounds.length()<=3)
             sounds.keys().forEach { name ->
@@ -113,7 +114,7 @@ class BackupRepository @Inject constructor(
         }
         settings.validateBackup(p.optJSONObject("settings") ?: JSONObject())
         styles.validateBackup(p.optJSONObject("widgets") ?: JSONObject())
-        listOf("tasbih" to setOf("volume","haptics"),"updates" to setOf("auto","wifi","beta")).forEach { (key,allowed) ->
+        listOf("tasbih" to setOf("volume","haptics"),"updates" to setOf("auto","wifi","beta"),"insights" to setOf("coach_hidden")).forEach { (key,allowed) ->
             p.optJSONObject(key)?.let { obj -> require(obj.keys().asSequence().all { it in allowed && obj.get(it) is Boolean }) }
         }
     }
@@ -139,6 +140,10 @@ class BackupRepository @Inject constructor(
             if(!merge) edit.clear()
             obj.keys().forEach { k -> if(!merge || !sp.contains(k)) edit.putBoolean(k,obj.getBoolean(k)) }
             check(edit.commit()) { "Could not restore counter settings" }
+        }
+        p.optJSONObject("insights")?.let { obj ->
+            val sp=ctx.getSharedPreferences("insights",Context.MODE_PRIVATE)
+            if(obj.has("coach_hidden") && (!merge || !sp.contains("coach_hidden"))) check(sp.edit().putBoolean("coach_hidden",obj.getBoolean("coach_hidden")).commit()) { "Could not restore coach settings" }
         }
         if(!merge) p.optJSONObject("updates")?.let { obj ->
             if(obj.has("auto")) updates.setAutoCheck(obj.getBoolean("auto"))
