@@ -47,7 +47,7 @@ class Phase16UiTest {
         rule.onNodeWithText("Show iqamah times").assertExists()
         rule.onAllNodesWithText("Fixed clock time").onFirst().performScrollTo().performClick()
         rule.onAllNodes(hasText("Iqamah at",substring = true)).onFirst().assertExists()
-        rule.onAllNodesWithText("Iqamah notification").onFirst().assertExists()
+        rule.onAllNodesWithText("Before-iqamah alarm").onFirst().assertExists()
         rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Jumu'ah override"))
         rule.onNodeWithText("Jumu'ah override").performClick()
         rule.onNode(hasText("Jumu'ah at",substring = true)).assertExists()

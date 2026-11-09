@@ -35,8 +35,15 @@ class AlarmScheduler @Inject constructor(
         for (p in Prayer.entries) for (t in listOf(AlarmType.PRAYER, AlarmType.REMINDER, AlarmType.IQAMA, AlarmType.IQAMA_NOTICE)) {
             pending(t, p, null, 0L, PendingIntent.FLAG_NO_CREATE)?.let { am.cancel(it); it.cancel() }
         }
-        plan.forEach { set(it, useAlarmClock = it.type == AlarmType.PRAYER && s.mode(it.prayer) == NotifyMode.ADHAN) }
+        plan.forEach { set(it, useAlarmClock = useAlarmClock(s, it)) }
         Log.i(TAG, "Scheduled ${plan.size} alarms; exact=${canScheduleExact()}")
+    }
+
+    /** Audible alarms (adhan and the before-iqamah alarm) use setAlarmClock: Doze-exempt and allowed to start the sound service. */
+    internal fun useAlarmClock(s: com.kamalahmed.prayerapp.data.settings.AppSettings, a: PlannedAlarm): Boolean = when (a.type) {
+        AlarmType.PRAYER -> s.mode(a.prayer) == NotifyMode.ADHAN
+        AlarmType.IQAMA_NOTICE -> Iqamah.alarm(s, a.prayer, a.prayerTime)
+        else -> false
     }
 
     fun scheduleSnooze(prayer: Prayer, prayerTimeMillis: Long, minutes: Int) {

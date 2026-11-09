@@ -12,7 +12,10 @@ data class AppSettings(
     val calcMethod: String = "DUBAI",
     val asrMethod: AsrMethod = AsrMethod.STANDARD,
     val highLatRule: HighLatitudeRule = HighLatitudeRule.NONE,
+    /** Start-time (adhan) offset per prayer in minutes, ±6 h. Shifts alarms, widgets, Today and tracking. */
     val adjustments: Map<Prayer, Int> = emptyMap(),
+    /** Optional fixed start time (minute of day) per prayer, e.g. Dhuhr always 1:30 PM. Replaces calculation + offset. */
+    val startFixed: Map<Prayer, Int> = emptyMap(),
     // Location
     val autoLocation: Boolean = false,
     val latitude: Double = 25.3463,
@@ -34,12 +37,23 @@ data class AppSettings(
     val iqamaFixed: Map<Prayer, Int> = emptyMap(),
     val iqamaNotifications: Set<Prayer> = emptySet(),
     val iqamaBefore: Map<Prayer, Int> = emptyMap(),
+    /** Prayers whose before-iqamah alert is a quiet notification instead of the full alarm (alarm is the default). */
+    val iqamaQuiet: Set<Prayer> = emptySet(),
     val jumuahEnabled: Boolean = false,
     val jumuahFixed: Boolean = true,
     val jumuahOffset: Int = 20,
     val jumuahMinute: Int = 13 * 60,
     val jumuahNotify: Boolean = false,
     val jumuahBefore: Int = 0,
+    val jumuahQuiet: Boolean = false,
+    // Before-iqamah alarm sound: separate from the adhan; always plays on the ALARM stream.
+    val iqamahSound: String = IQAMAH_SYSTEM_ALARM,
+    val iqamahSoundUri: String? = null,
+    val iqamahSoundName: String = "System alarm sound",
+    val iqamahMaxPlaySeconds: Int = 60,
+    val iqamahLoop: Boolean = true,
+    val iqamahVolume: Int = 100,
+    val iqamahFullScreen: Boolean = false,
     // Notifications
     val notifyModes: Map<Prayer, NotifyMode> = Prayer.entries.associateWith {
         if (it == Prayer.SUNRISE) NotifyMode.OFF else NotifyMode.ADHAN
@@ -69,4 +83,9 @@ data class AppSettings(
     fun adjustment(p: Prayer) = adjustments[p] ?: 0
     fun mode(p: Prayer) = notifyModes[p] ?: NotifyMode.OFF
     fun iqama(p: Prayer) = iqamaMinutes[p] ?: 0
+
+    companion object {
+        const val IQAMAH_SYSTEM_ALARM = "system_alarm"
+        const val IQAMAH_RINGTONE = "ringtone"
+    }
 }

@@ -52,13 +52,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     AlarmType.IQAMA_NOTICE -> {
                         val adhan = Instant.ofEpochMilli(prayerTime).atZone(zone)
                         val iq = Iqamah.time(s,prayer,adhan)
-                        if (iq != null && Iqamah.enabled(s,prayer,adhan)) {
-                            val name = Iqamah.label(s,prayer,adhan)
-                            val lead = Iqamah.lead(s,prayer,adhan)
-                            context.notifySafely(1500 + prayer.ordinal,
-                                baseNotification(context, Channels.BEEP, if (lead == 0) "Iqamah – $name" else "Iqamah – $name in $lead min",
-                                    "Iqamah at ${TimeFormat.time(iq, false)}").setCategory(NotificationCompat.CATEGORY_REMINDER).setTimeoutAfter(10 * 60_000L))
-                        }
+                        if (iq != null && Iqamah.enabled(s,prayer,adhan)) onIqamah(context, s, prayer, adhan, iq)
                     }
                 }
             } finally {
@@ -68,6 +62,27 @@ class AlarmReceiver : BroadcastReceiver() {
                 guard("AlarmReceiver", "hooks.onAlarm") { hooks.onAlarm(type, prayer) }
             }
         }
+    }
+
+    /** Before-iqamah alert: full alarm via the shared sound service, or the user's chosen quiet notification. */
+    private fun onIqamah(ctx: Context, s: com.kamalahmed.prayerapp.data.settings.AppSettings, prayer: Prayer, adhan: java.time.ZonedDateTime, iq: java.time.ZonedDateTime) {
+        val name = Iqamah.label(s,prayer,adhan)
+        val lead = Iqamah.lead(s,prayer,adhan)
+        val title = iqamahTitle(name, lead)
+        val text = "Iqamah at ${TimeFormat.time(iq, s.use24h)}"
+        val iqMillis = iq.toInstant().toEpochMilli()
+        if (Iqamah.alarm(s,prayer,adhan)) {
+            try {
+                ContextCompat.startForegroundService(ctx, AdhanService.iqamahIntent(ctx, prayer, adhan.toInstant().toEpochMilli(), iqMillis))
+                return
+            } catch (e: Exception) {
+                CrashLog.nonFatal("AlarmReceiver", "Iqamah alarm service refused, using alarm-channel notification", e)
+            }
+        }
+        val channel = if (Iqamah.alarm(s,prayer,adhan)) Channels.IQAMAH_ALARM else Channels.BEEP
+        ctx.notifySafely(NotificationIds.iqamahNotice(prayer.ordinal),
+            baseNotification(ctx, channel, title, text).setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setPriority(NotificationCompat.PRIORITY_HIGH).setTimeoutAfter(maxOf(lead, 10) * 60_000L))
     }
 
     private fun onPrayer(
@@ -112,6 +127,7 @@ class AlarmReceiver : BroadcastReceiver() {
 
     companion object {
         const val STALE_MS = 30 * 60_000L
+        fun iqamahTitle(name: String, lead: Int) = if (lead == 0) "Iqamah – $name now" else "Iqamah – $name in $lead min"
     }
 }
 

@@ -49,6 +49,16 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         fun iqFixed(p: Prayer) = intPreferencesKey("iq_fixed_${p.name}")
         fun iqNotify(p: Prayer) = booleanPreferencesKey("iq_notify_${p.name}")
         fun iqBefore(p: Prayer) = intPreferencesKey("iq_before_${p.name}")
+        fun iqQuiet(p: Prayer) = booleanPreferencesKey("iq_quiet_${p.name}")
+        fun startFixed(p: Prayer) = intPreferencesKey("start_fixed_${p.name}")
+        val jumQuiet = booleanPreferencesKey("jumuah_quiet")
+        val iqSound = stringPreferencesKey("iqamah_sound")
+        val iqSoundUri = stringPreferencesKey("iqamah_sound_uri")
+        val iqSoundName = stringPreferencesKey("iqamah_sound_name")
+        val iqMaxPlay = intPreferencesKey("iqamah_max_play")
+        val iqLoop = booleanPreferencesKey("iqamah_loop")
+        val iqVolume = intPreferencesKey("iqamah_volume")
+        val iqFullScreen = booleanPreferencesKey("iqamah_full_screen")
         val jumOn = booleanPreferencesKey("jumuah_on")
         val jumFixed = booleanPreferencesKey("jumuah_fixed")
         val jumOffset = intPreferencesKey("jumuah_offset")
@@ -102,7 +112,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         val source = com.kamalahmed.prayerapp.backup.PreferenceJson.decode(obj)
         val expected = androidx.datastore.preferences.core.mutablePreferencesOf().apply { write(AppSettings()) }.asMap().mapKeys { it.key.name }.toMutableMap()
         expected["sound_uri"] = ""
-        Prayer.obligatory.forEach { expected["iq_fixed_${it.name}"] = 0 }
+        Prayer.obligatory.forEach { expected["iq_fixed_${it.name}"] = 0; expected["start_fixed_${it.name}"] = 0 }
+        expected["iqamah_sound_uri"] = ""
         source.asMap().forEach { (key,value) -> require(expected[key.name]?.javaClass == value.javaClass) { "Invalid settings type: ${key.name}" } }
         listOf("summary_daily_time","summary_weekly_time").forEach { key -> source.asMap().entries.firstOrNull { it.key.name==key }?.let { require(it.value is Int && it.value as Int in 0..1439) { "Invalid summary time" } } }
         val s = source.toSettings()
@@ -111,7 +122,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         if(s.soundSource == SoundSource.RINGTONE && s.soundUri != null) require(android.net.Uri.parse(s.soundUri).scheme in setOf("content","android.resource"))
         if(s.soundSource == SoundSource.CUSTOM_FILE && s.soundUri != null) require(s.soundUri.substringAfterLast('/').matches(Regex("custom\\.[A-Za-z0-9]{1,5}")))
         require(s.volumePercent in 0..100 && s.hijriAdjust in -3..3 && s.maxPlaySeconds in 1..3600 && s.preReminderMinutes in 0..180 && s.snoozeMinutes in 1..180)
-        require(s.adjustments.values.all { it in -180..180 } && s.iqamaMinutes.values.all { it in 0..180 })
+        val raw = source.asMap().mapKeys { it.key.name }
+        Prayer.entries.forEach { p -> (raw["adj_${p.name}"] as? Int)?.let { require(it in com.kamalahmed.prayerapp.core.prayer.StartTimeLimits.offsetRange) { "Invalid start adjustment" } } }
+        Prayer.obligatory.forEach { p -> (raw["start_fixed_${p.name}"] as? Int)?.let { require(it in 0..1439) { "Invalid fixed start time" } } }
+        require(s.iqamaMinutes.values.all { it in 0..180 })
+        (raw["iqamah_volume"] as? Int)?.let { require(it in 0..100) { "Invalid iqamah volume" } }
+        (raw["iqamah_max_play"] as? Int)?.let { require(it in 5..1800) { "Invalid iqamah play limit" } }
+        (raw["iqamah_sound"] as? String)?.let { v -> require(v == AppSettings.IQAMAH_SYSTEM_ALARM || v == AppSettings.IQAMAH_RINGTONE || v in setOf("adhan_full","adhan_short","chime")) { "Invalid iqamah sound" } }
+        if (s.iqamahSound == AppSettings.IQAMAH_RINGTONE && s.iqamahSoundUri != null) require(android.net.Uri.parse(s.iqamahSoundUri).scheme in setOf("content","android.resource"))
     }
 
     suspend fun backupRestore(obj: org.json.JSONObject, merge: Boolean) {
@@ -129,7 +147,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             calcMethod = this[K.calcMethod] ?: d.calcMethod,
             asrMethod = this[K.asr].toEnum(d.asrMethod),
             highLatRule = this[K.highLat].toEnum(d.highLatRule),
-            adjustments = Prayer.entries.associateWith { this[K.adj(it)] ?: 0 },
+            adjustments = Prayer.entries.associateWith { (this[K.adj(it)] ?: 0).coerceIn(com.kamalahmed.prayerapp.core.prayer.StartTimeLimits.offsetRange) },
+            startFixed = Prayer.obligatory.mapNotNull { p -> this[K.startFixed(p)]?.takeIf { it in 0..1439 }?.let { p to it } }.toMap(),
             autoLocation = this[K.autoLoc] ?: d.autoLocation,
             latitude = this[K.lat] ?: d.latitude,
             longitude = this[K.lng] ?: d.longitude,
@@ -146,12 +165,22 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             iqamaFixed = Prayer.obligatory.mapNotNull { p -> this[K.iqFixed(p)]?.takeIf { it in 0..1439 }?.let { p to it } }.toMap(),
             iqamaNotifications = Prayer.obligatory.filter { this[K.iqNotify(it)] == true }.toSet(),
             iqamaBefore = Prayer.obligatory.associateWith { (this[K.iqBefore(it)] ?: 0).coerceIn(0, 180) },
+            // Absent key (all installs up to beta.11) = full alarm; existing enable flags and lead minutes are untouched.
+            iqamaQuiet = Prayer.obligatory.filter { this[K.iqQuiet(it)] == true }.toSet(),
             jumuahEnabled = this[K.jumOn] ?: false,
             jumuahFixed = this[K.jumFixed] ?: true,
             jumuahOffset = (this[K.jumOffset] ?: 20).coerceIn(0,180),
             jumuahMinute = (this[K.jumTime] ?: d.jumuahMinute).coerceIn(0, 1439),
             jumuahNotify = this[K.jumNotify] ?: false,
             jumuahBefore = (this[K.jumBefore] ?: 0).coerceIn(0, 180),
+            jumuahQuiet = this[K.jumQuiet] ?: false,
+            iqamahSound = this[K.iqSound] ?: d.iqamahSound,
+            iqamahSoundUri = this[K.iqSoundUri],
+            iqamahSoundName = this[K.iqSoundName] ?: d.iqamahSoundName,
+            iqamahMaxPlaySeconds = (this[K.iqMaxPlay] ?: d.iqamahMaxPlaySeconds).coerceIn(5, 1800),
+            iqamahLoop = this[K.iqLoop] ?: d.iqamahLoop,
+            iqamahVolume = (this[K.iqVolume] ?: d.iqamahVolume).coerceIn(0, 100),
+            iqamahFullScreen = this[K.iqFullScreen] ?: d.iqamahFullScreen,
             notifyModes = Prayer.entries.associateWith { this[K.mode(it)].toEnum(d.mode(it)) },
             soundSource = this[K.soundSource].toEnum(d.soundSource),
             bundledSound = this[K.bundled] ?: d.bundledSound,
@@ -177,7 +206,8 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         this[K.calcMethod] = s.calcMethod
         this[K.asr] = s.asrMethod.name
         this[K.highLat] = s.highLatRule.name
-        Prayer.entries.forEach { this[K.adj(it)] = s.adjustment(it) }
+        Prayer.entries.forEach { this[K.adj(it)] = s.adjustment(it).coerceIn(com.kamalahmed.prayerapp.core.prayer.StartTimeLimits.offsetRange) }
+        Prayer.obligatory.forEach { p -> s.startFixed[p]?.takeIf { it in 0..1439 }?.let { this[K.startFixed(p)] = it } ?: remove(K.startFixed(p)) }
         this[K.autoLoc] = s.autoLocation
         this[K.lat] = s.latitude
         this[K.lng] = s.longitude
@@ -195,6 +225,7 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
             s.iqamaFixed[p]?.let { this[K.iqFixed(p)] = it.coerceIn(0,1439) } ?: remove(K.iqFixed(p))
             this[K.iqNotify(p)] = p in s.iqamaNotifications
             this[K.iqBefore(p)] = (s.iqamaBefore[p] ?: 0).coerceIn(0,180)
+            this[K.iqQuiet(p)] = p in s.iqamaQuiet
         }
         this[K.jumOn] = s.jumuahEnabled
         this[K.jumFixed] = s.jumuahFixed
@@ -202,6 +233,14 @@ class SettingsRepository @Inject constructor(@ApplicationContext private val con
         this[K.jumTime] = s.jumuahMinute.coerceIn(0,1439)
         this[K.jumNotify] = s.jumuahNotify
         this[K.jumBefore] = s.jumuahBefore.coerceIn(0,180)
+        this[K.jumQuiet] = s.jumuahQuiet
+        this[K.iqSound] = s.iqamahSound
+        if (s.iqamahSoundUri != null) this[K.iqSoundUri] = s.iqamahSoundUri else remove(K.iqSoundUri)
+        this[K.iqSoundName] = s.iqamahSoundName
+        this[K.iqMaxPlay] = s.iqamahMaxPlaySeconds.coerceIn(5,1800)
+        this[K.iqLoop] = s.iqamahLoop
+        this[K.iqVolume] = s.iqamahVolume.coerceIn(0,100)
+        this[K.iqFullScreen] = s.iqamahFullScreen
         Prayer.entries.forEach { this[K.mode(it)] = s.mode(it).name }
         this[K.soundSource] = s.soundSource.name
         this[K.bundled] = s.bundledSound

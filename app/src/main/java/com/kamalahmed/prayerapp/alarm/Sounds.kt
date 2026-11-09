@@ -38,6 +38,18 @@ object Sounds {
 
     fun fallback(ctx: Context): Uri = bundledUri(ctx, "adhan_full")
 
+    /** Before-iqamah alarm sound, independent from the adhan choice. Never throws; falls back to the bundled chime. */
+    fun resolveIqamah(ctx: Context, s: AppSettings): Uri = runCatching {
+        when (s.iqamahSound) {
+            AppSettings.IQAMAH_SYSTEM_ALARM -> android.media.RingtoneManager.getActualDefaultRingtoneUri(ctx, android.media.RingtoneManager.TYPE_ALARM)
+                ?: android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI
+            AppSettings.IQAMAH_RINGTONE -> s.iqamahSoundUri?.let(Uri::parse)
+            else -> bundled.firstOrNull { it.id == s.iqamahSound }?.let { bundledUri(ctx, it.id) }
+        }
+    }.getOrNull() ?: iqamahFallback(ctx)
+
+    fun iqamahFallback(ctx: Context): Uri = bundledUri(ctx, "chime")
+
     /**
      * Copy a user-picked audio document into app storage so playback never depends on
      * a revocable URI grant. Returns (absolutePath, displayName).

@@ -35,6 +35,16 @@ class PrayerSchedule(private val params: CalcParams) {
         return d.times.filter { it.key.isPrayer && !it.value.isAfter(now) }.keys.toList()
     }
 
+    /**
+     * The prayer day an event belongs to. A shifted/fixed Isha may fall after midnight (e.g. 12:30 AM):
+     * it still belongs to the previous day's prayers, so it is logged there.
+     */
+    fun dateOf(prayer: Prayer, time: ZonedDateTime): LocalDate {
+        val d = time.withZoneSameInstant(params.zone).toLocalDate()
+        val prev = d.minusDays(1)
+        return if (day(prev).times[prayer]?.toInstant() == time.toInstant()) prev else d
+    }
+
     /** Upcoming events strictly after [now], up to [count]. */
     fun upcoming(now: ZonedDateTime, count: Int, includeSunrise: Boolean = true): List<PrayerEvent> {
         val out = ArrayList<PrayerEvent>()

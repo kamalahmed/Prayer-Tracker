@@ -44,6 +44,10 @@ class SettingsViewModel @Inject constructor(
         ContextCompat.startForegroundService(app, AdhanService.previewIntent(app))
     }
 
+    fun previewIqamah() = com.kamalahmed.prayerapp.core.safety.guard("SettingsViewModel","iqamah preview") {
+        ContextCompat.startForegroundService(app, AdhanService.iqamahPreviewIntent(app))
+    }
+
     fun stopPreview() { app.startService(AdhanService.stopIntent(app)) }
 
     fun setRingtone(uri: Uri?, title: String) = update {

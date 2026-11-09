@@ -20,6 +20,7 @@ fun AppSettings.toCalcParams(): CalcParams = CalcParams(
     asr = asrMethod,
     highLatRule = highLatRule,
     adjustments = adjustments,
+    fixedTimes = startFixed,
 )
 
 @Singleton

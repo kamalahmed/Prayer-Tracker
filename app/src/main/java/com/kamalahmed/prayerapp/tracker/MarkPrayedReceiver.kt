@@ -1,5 +1,6 @@
 package com.kamalahmed.prayerapp.tracker
 
+import com.kamalahmed.prayerapp.data.prayer.toCalcParams
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -25,8 +26,12 @@ class MarkPrayedReceiver : BroadcastReceiver() {
         launchAsync("MarkPrayed") {
             // Use the prayer-time zone from settings (same as the schedule), not the device zone: they differ
             // when travelling with a manually chosen city, which marked the wrong day near midnight.
-            val zone = runCatching { ZoneId.of(settings.current().timeZoneId) }.getOrDefault(ZoneId.systemDefault())
-            val date = Instant.ofEpochMilli(time).atZone(zone).toLocalDate()
+            val current = settings.current()
+            val zone = runCatching { ZoneId.of(current.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
+            val at = Instant.ofEpochMilli(time).atZone(zone)
+            // An Isha shifted past midnight belongs to the previous day's log.
+            val date = runCatching { com.kamalahmed.prayerapp.core.prayer.PrayerSchedule(current.toCalcParams()).dateOf(prayer, at) }
+                .getOrDefault(at.toLocalDate())
             tracker.set(date, prayer, PrayerStatus.ON_TIME)
             if (notifId != 0) NotificationManagerCompat.from(context).cancel(notifId)
         }

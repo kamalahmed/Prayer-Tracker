@@ -27,7 +27,18 @@ data class CalcParams(
     val highLatRule: HighLatitudeRule = HighLatitudeRule.NONE,
     /** User minute offsets per prayer, applied after method adjustments. */
     val adjustments: Map<Prayer, Int> = emptyMap(),
+    /** Optional fixed local start time (minute of day) per prayer; replaces the calculated time + offset. */
+    val fixedTimes: Map<Prayer, Int> = emptyMap(),
 )
+
+/** Bounds for user start-time changes: up to six hours either way. */
+object StartTimeLimits {
+    const val MIN_OFFSET = -360
+    const val MAX_OFFSET = 360
+    val offsetRange = MIN_OFFSET..MAX_OFFSET
+    /** A fixed Isha before noon (e.g. 12:30 AM) is the following night, after midnight. */
+    const val ISHA_NEXT_DAY_BEFORE = 12 * 60
+}
 
 /** Prayer times for one civil day, rounded to the minute. */
 data class PrayerDay(
@@ -37,6 +48,8 @@ data class PrayerDay(
     val midnight: ZonedDateTime,
     /** Start of the last third of the night. */
     val lastThird: ZonedDateTime,
+    /** Prayers whose user offset/fixed time was limited so the day's order stays Fajr < Sunrise < ... < Isha < next Fajr. */
+    val limited: Set<Prayer> = emptySet(),
 ) {
     operator fun get(p: Prayer): ZonedDateTime = times.getValue(p)
 }
@@ -48,17 +61,59 @@ data class PrayerDay(
 object PrayerTimesCalculator {
 
     fun calculate(date: LocalDate, p: CalcParams): PrayerDay {
-        val today = rawTimes(date, p)
-        val tomorrow = rawTimes(date.plusDays(1), p)
-        val maghrib = today.getValue(Prayer.MAGHRIB)
-        val nextFajr = tomorrow.getValue(Prayer.FAJR)
-        val night = Duration.between(maghrib, nextFajr)
+        val base = rawTimes(date, p)
+        val baseTomorrow = rawTimes(date.plusDays(1), p)
+        // Night thirds are astronomical (calculated Maghrib → calculated Fajr), not masjid times.
+        val maghrib = base.getValue(Prayer.MAGHRIB)
+        val night = Duration.between(maghrib, baseTomorrow.getValue(Prayer.FAJR))
+        val nextFajr = applyUser(date.plusDays(1), baseTomorrow, baseTomorrow.getValue(Prayer.FAJR).plusDays(1), p).first.getValue(Prayer.FAJR)
+        val (today, limited) = applyUser(date, base, nextFajr, p)
         return PrayerDay(
             date = date,
             times = today,
             midnight = roundToMinute(maghrib.plus(night.dividedBy(2))),
             lastThird = roundToMinute(maghrib.plus(night.multipliedBy(2).dividedBy(3))),
+            limited = limited,
         )
+    }
+
+    /**
+     * Applies the user's per-prayer offset (bounded to ±6 h) or fixed clock time to the calculated times,
+     * then keeps a strict order: Fajr not before local midnight, each prayer at least a minute after the
+     * previous one, and Isha (which may move past midnight) a minute before the next Fajr. The prayer the user
+     * changed is the one limited; unchanged neighbours keep their calculated times.
+     */
+    internal fun applyUser(
+        date: LocalDate, base: Map<Prayer, ZonedDateTime>, nextFajr: ZonedDateTime, p: CalcParams,
+    ): Pair<Map<Prayer, ZonedDateTime>, Set<Prayer>> {
+        val active = p.adjustments.any { it.value != 0 } || p.fixedTimes.any { it.key.isPrayer && it.value in 0..1439 }
+        if (!active) return base to emptySet()
+        val desired = LinkedHashMap<Prayer, ZonedDateTime>()
+        for ((prayer, calculated) in base) {
+            val fixed = p.fixedTimes[prayer]?.takeIf { prayer.isPrayer && it in 0..1439 }
+            desired[prayer] = if (fixed != null) {
+                val day = if (prayer == Prayer.ISHA && fixed < StartTimeLimits.ISHA_NEXT_DAY_BEFORE) date.plusDays(1) else date
+                day.atTime(fixed / 60, fixed % 60).atZone(p.zone)
+            } else {
+                calculated.plusMinutes((p.adjustments[prayer] ?: 0).coerceIn(StartTimeLimits.offsetRange).toLong())
+            }
+        }
+        val changed = base.keys.filter { (p.fixedTimes[it]?.takeIf { m -> it.isPrayer && m in 0..1439 } != null) || (p.adjustments[it] ?: 0) != 0 }.toSet()
+        val keys = desired.keys.toList()
+        val limited = HashSet<Prayer>()
+        val out = LinkedHashMap<Prayer, ZonedDateTime>()
+        for ((i, prayer) in keys.withIndex()) {
+            var v = desired.getValue(prayer)
+            // A changed prayer may not pass the next one; Isha may not pass the next Fajr.
+            if (prayer in changed || i == keys.lastIndex) {
+                val upper = (if (i == keys.lastIndex) nextFajr else desired.getValue(keys[i + 1])).minusMinutes(1)
+                if (v > upper) { v = upper; limited += prayer }
+            }
+            val lower = if (i == 0) date.atStartOfDay(p.zone) else out.getValue(keys[i - 1]).plusMinutes(1)
+            if (v < lower) { v = lower; limited += prayer }
+            out[prayer] = v
+        }
+        return out to limited
     }
 
     /** fajr, sunrise, dhuhr, asr, sunset, maghrib, isha in UTC hours; entries may be NaN at extreme latitudes. */
@@ -118,7 +173,8 @@ object PrayerTimesCalculator {
 
         val midnightUtc = date.atStartOfDay(ZoneId.of("UTC"))
         fun toZoned(hours: Double, prayer: Prayer): ZonedDateTime {
-            val totalAdj = (p.method.methodAdjustments[prayer] ?: 0) + (p.adjustments[prayer] ?: 0)
+            // User offsets / fixed times are applied afterwards in applyUser so they can be bounded and ordered.
+            val totalAdj = p.method.methodAdjustments[prayer] ?: 0
             val seconds = (hours * 3600.0).roundToLong() + totalAdj * 60L
             return roundToMinute(midnightUtc.plusSeconds(seconds).withZoneSameInstant(p.zone))
         }

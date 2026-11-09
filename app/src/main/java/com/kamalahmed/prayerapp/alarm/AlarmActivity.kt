@@ -61,6 +61,7 @@ class AlarmActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val prayer = intent.getStringExtra(EXTRA_PRAYER)?.let { n -> Prayer.entries.firstOrNull { it.name == n } }
         val time = intent.getLongExtra(EXTRA_TIME, System.currentTimeMillis())
+        val iqamah = intent.getBooleanExtra(EXTRA_IQAMAH, false)
         val is24 = android.text.format.DateFormat.is24HourFormat(this)
         setContent {
             PrayerTheme {
@@ -83,13 +84,15 @@ class AlarmActivity : ComponentActivity() {
                             TimeFormat.time(Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()), is24),
                             fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Text("It's time for prayer", color = Gold, modifier = Modifier.padding(top = 8.dp))
+                        Text(if (iqamah) "Iqamah is coming up" else "It's time for prayer", color = Gold, modifier = Modifier.padding(top = 8.dp))
                         Spacer(Modifier.height(48.dp))
                         Row {
-                            OutlinedButton(onClick = { startService(AdhanService.snoozeIntent(this@AlarmActivity)); finish() }, modifier = Modifier.height(56.dp)) {
-                                Text("Snooze")
+                            if (!iqamah) {
+                                OutlinedButton(onClick = { startService(AdhanService.snoozeIntent(this@AlarmActivity)); finish() }, modifier = Modifier.height(56.dp)) {
+                                    Text("Snooze")
+                                }
+                                Spacer(Modifier.width(16.dp))
                             }
-                            Spacer(Modifier.width(16.dp))
                             Button(
                                 onClick = { startService(AdhanService.stopIntent(this@AlarmActivity)); finish() },
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -105,8 +108,9 @@ class AlarmActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_PRAYER = "prayer"
         private const val EXTRA_TIME = "time"
-        fun intent(ctx: Context, prayer: Prayer, time: Long) = Intent(ctx, AlarmActivity::class.java)
-            .putExtra(EXTRA_PRAYER, prayer.name).putExtra(EXTRA_TIME, time)
+        private const val EXTRA_IQAMAH = "iqamah"
+        fun intent(ctx: Context, prayer: Prayer, time: Long, iqamah: Boolean = false) = Intent(ctx, AlarmActivity::class.java)
+            .putExtra(EXTRA_PRAYER, prayer.name).putExtra(EXTRA_TIME, time).putExtra(EXTRA_IQAMAH, iqamah)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
     }
 }

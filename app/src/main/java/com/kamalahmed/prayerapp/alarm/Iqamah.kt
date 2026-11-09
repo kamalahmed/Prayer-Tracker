@@ -9,6 +9,8 @@ object Iqamah {
     fun friday(s: AppSettings, p: Prayer, adhan: ZonedDateTime) = s.jumuahEnabled && p == Prayer.DHUHR && adhan.dayOfWeek == DayOfWeek.FRIDAY
     fun enabled(s: AppSettings, p: Prayer, adhan: ZonedDateTime) = if (friday(s,p,adhan)) s.jumuahNotify else p in s.iqamaNotifications
     fun lead(s: AppSettings, p: Prayer, adhan: ZonedDateTime) = (if (friday(s,p,adhan)) s.jumuahBefore else s.iqamaBefore[p] ?: 0).coerceIn(0,180)
+    /** True = full alarm (ALARM stream, app-played sound); false = quiet notification on the notification stream. */
+    fun alarm(s: AppSettings, p: Prayer, adhan: ZonedDateTime) = if (friday(s,p,adhan)) !s.jumuahQuiet else p !in s.iqamaQuiet
     fun label(s: AppSettings, p: Prayer, adhan: ZonedDateTime) = if (friday(s,p,adhan)) "Jumu'ah" else p.displayName
     fun time(s: AppSettings, p: Prayer, adhan: ZonedDateTime): ZonedDateTime? {
         if (!p.isPrayer) return null

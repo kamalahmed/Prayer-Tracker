@@ -116,16 +116,7 @@ fun CalculationScreen(vm: SettingsViewModel, onBack: () -> Unit) {
             CardGroup {
                 HighLatitudeRule.entries.forEach { r -> RadioRow(r.label, s.highLatRule == r) { vm.update { it.copy(highLatRule = r) } } }
             }
-            SectionHeader("Manual adjustments (minutes)")
-            CardGroup {
-                Prayer.entries.forEachIndexed { i, p ->
-                    if (i > 0) RowDivider()
-                    val v = s.adjustment(p)
-                    StepperRow(p.displayName, if (v > 0) "+$v min" else "$v min",
-                        onMinus = { vm.update { it.copy(adjustments = it.adjustments + (p to (v - 1).coerceAtLeast(-30))) } },
-                        onPlus = { vm.update { it.copy(adjustments = it.adjustments + (p to (v + 1).coerceAtMost(30))) } })
-                }
-            }
+            StartTimeAdjustments(s) { change -> vm.update(change) }
         }
     }
 }
@@ -237,9 +228,36 @@ fun IqamaScreen(vm: SettingsViewModel, onBack: () -> Unit) {
             else old.copy(iqamaNotifications = if (on) old.iqamaNotifications + prayer else old.iqamaNotifications - prayer)
         }
     }
+    val playing by vm.playing.collectAsStateWithLifecycle()
+    val ringtone = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
+        com.kamalahmed.prayerapp.core.safety.guard("Iqamah","ringtone result") {
+            if (res.resultCode == android.app.Activity.RESULT_OK) {
+                val uri: android.net.Uri? = if (android.os.Build.VERSION.SDK_INT >= 33)
+                    res.data?.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI, android.net.Uri::class.java)
+                else @Suppress("DEPRECATION") res.data?.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+                if (uri != null) {
+                    val title = runCatching { android.media.RingtoneManager.getRingtone(ctx, uri)?.getTitle(ctx) }.getOrNull() ?: "Ringtone"
+                    vm.update { it.copy(iqamahSound = AppSettings.IQAMAH_RINGTONE, iqamahSoundUri = uri.toString(), iqamahSoundName = title) }
+                }
+            }
+        }
+    }
     Messages(vm)
     SubScreen("Iqamah",onBack) {
-        IqamahSettingsContent(s,{ change -> vm.update(change) },::notify)
+        IqamahSettingsContent(s,{ change -> vm.update(change) },::notify,
+            onPickRingtone = {
+                com.kamalahmed.prayerapp.core.safety.guard("Iqamah","ringtone picker") {
+                    ringtone.launch(android.content.Intent(android.media.RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TYPE, android.media.RingtoneManager.TYPE_ALARM or android.media.RingtoneManager.TYPE_RINGTONE)
+                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                        putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TITLE, "Iqamah alarm sound")
+                        s.iqamahSoundUri?.takeIf { s.iqamahSound == AppSettings.IQAMAH_RINGTONE }?.let { putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, android.net.Uri.parse(it)) }
+                    })
+                }
+            },
+            onPreview = { on -> if (on) vm.previewIqamah() else vm.stopPreview() },
+            previewing = playing?.let { it.preview && it.isIqamah } == true)
     }
 }
 

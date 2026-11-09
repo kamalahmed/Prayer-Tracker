@@ -18,6 +18,8 @@ object Channels {
     const val SILENT = "prayer_silent_v1"
     const val REMINDER = "reminder_v1"
     const val IQAMA = "iqama_v1"
+    /** Fallback when the before-iqamah alarm service cannot start: sounds on the ALARM stream, not notification volume. */
+    const val IQAMAH_ALARM = "iqamah_alarm_v1"
 
     fun create(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
@@ -43,6 +45,12 @@ object Channels {
                 NotificationChannel(IQAMA, "Iqama countdown", NotificationManager.IMPORTANCE_LOW).apply {
                     setSound(null, null)
                 },
+                NotificationChannel(IQAMAH_ALARM, "Before-iqamah alarm", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Shown while the before-iqamah alarm plays, and used as a loud fallback."
+                    setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM), AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                },
             )
         )
     }
@@ -58,6 +66,7 @@ object NotificationIds {
     fun prayer(ordinal: Int) = 1100 + ordinal
     fun reminder(ordinal: Int) = 1200 + ordinal
     fun iqama(ordinal: Int) = 1300 + ordinal
+    fun iqamahNotice(ordinal: Int) = 1500 + ordinal
     const val DUA = 1400
 }
 
